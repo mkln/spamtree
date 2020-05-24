@@ -1,0 +1,11 @@
+Package: spamtree
+Type: Package
+Title: Bayesian Spatial Multiscale Trees for spatial linear regression
+Version: 0.1
+Date: 2020-04-01
+Author: M. Peruzzi
+Maintainer: M. Peruzzi <mklnsrc@gmail.com>
+Description: More about what it does (maybe more than one line)
+License: CC BY 4.0
+Imports: Rcpp (>= 1.0.3)
+LinkingTo: Rcpp, RcppArmadillo, RcppEigen, FNN
