@@ -1,3 +1,4 @@
+#' @export
 spamtree <- function(y, X, Z, coords, 
                        cell_size=25, K=rep(2, ncol(coords)),
                    mcmc        = list(keep=1000, burn=0, thin=1),
@@ -12,14 +13,14 @@ spamtree <- function(y, X, Z, coords,
   # cell_size = (approximate) number of location for each block
   # K = number of blocks at resolution L is K^(L-1), with L=1, ... , M.
   if(is.null(model_data)){
-    model_data <- spamtree_prebuild(y, X, Z, coords, cell_size, K, mcmc,
+    model_data <- prebuild(y, X, Z, coords, cell_size, K, mcmc,
                                 num_threads, use_alg, settings, prior, starting, debug)
   }
 
   list2env(model_data, environment())
   
   comp_time <- system.time({
-    results <- mesh_multires_mcmc(y, X, Z, cx_all, blocking,
+    results <- spamtree:::mesh_multires_mcmc(y, X, Z, cx_all, blocking,
                                 
                                 parents, children, 
                                 block_names, block_groups,
@@ -50,7 +51,7 @@ spamtree <- function(y, X, Z, coords,
   })
   
   list2env(results, environment())
-  return(list(coords    = coords,
+  return(list(coords    = cx_all,
               
               beta_mcmc    = beta_mcmc,
               tausq_mcmc   = tausq_mcmc,

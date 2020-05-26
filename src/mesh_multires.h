@@ -15,7 +15,7 @@ using namespace std;
 
 const double hl2pi = -.5 * log(2 * M_PI);
 
-class LMTmesh {
+class SpamTree {
 public:
   // meta
   int n;
@@ -156,10 +156,10 @@ public:
   std::chrono::steady_clock::time_point end_overall;
   
   // empty
-  LMTmesh();
+  SpamTree();
   
   // build everything
-  LMTmesh(
+  SpamTree(
     const arma::mat& y_in, 
     const arma::mat& X_in, 
     const arma::mat& Z_in,
@@ -186,17 +186,17 @@ public:
   
 };
 
-void LMTmesh::message(string s){
+void SpamTree::message(string s){
   if(verbose & debug){
     Rcpp::Rcout << s << "\n";
   }
 }
 
-LMTmesh::LMTmesh(){
+SpamTree::SpamTree(){
   
 }
 
-LMTmesh::LMTmesh(
+SpamTree::SpamTree(
   const arma::mat& y_in, 
   const arma::mat& X_in, 
   const arma::mat& Z_in,
@@ -224,7 +224,7 @@ LMTmesh::LMTmesh(
   
   use_alg = use_alg_in; //S:standard, P:residual process, R: rp recursive
   
-  message("~ LMTmesh initialization.\n");
+  message("~ SpamTree initialization.\n");
   
   start_overall = std::chrono::steady_clock::now();
   
@@ -232,7 +232,7 @@ LMTmesh::LMTmesh(
   verbose = v;
   debug = debugging;
   
-  message("LMTmesh::LMTmesh assign values.");
+  message("SpamTree::SpamTree assign values.");
   
   y                   = y_in;
   X                   = X_in;
@@ -297,14 +297,14 @@ LMTmesh::LMTmesh(
   predicting = true;
   
   // now elaborate
-  message("LMTmesh::LMTmesh : init_indexing()");
+  message("SpamTree::SpamTree : init_indexing()");
   init_indexing();
   
-  message("LMTmesh::LMTmesh : na_study()");
+  message("SpamTree::SpamTree : na_study()");
   na_study();
   y.elem(arma::find_nonfinite(y)).fill(0);
   
-  message("LMTmesh::LMTmesh : init_finalize()");
+  message("SpamTree::SpamTree : init_finalize()");
   init_finalize();
   
   
@@ -314,7 +314,7 @@ LMTmesh::LMTmesh(
   bprim = arma::zeros(p);
   Vim   = Vi * bprim;
   
-  message("LMTmesh::LMTmesh : make_gibbs_groups()");
+  message("SpamTree::SpamTree : make_gibbs_groups()");
   make_gibbs_groups();
   
   
@@ -342,14 +342,14 @@ LMTmesh::LMTmesh(
   
   if(verbose){
     end_overall = std::chrono::steady_clock::now();
-    Rcpp::Rcout << "LMTmesh::LMTmesh initializing took "
+    Rcpp::Rcout << "SpamTree::SpamTree initializing took "
                 << std::chrono::duration_cast<std::chrono::microseconds>(end_overall - start_overall).count()
                 << "us.\n";
   }
   
 }
 
-void LMTmesh::make_gibbs_groups(){
+void SpamTree::make_gibbs_groups(){
   // checks -- errors not allowed. use check_groups.cpp to fix errors.
   for(int g=0; g<n_gibbs_groups; g++){
     for(int i=0; i<n_blocks; i++){
@@ -397,7 +397,7 @@ void LMTmesh::make_gibbs_groups(){
   }
 }
 
-void LMTmesh::na_study(){
+void SpamTree::na_study(){
   // prepare stuff for NA management
   message("[na_study] NA management for predictions\n");
   
@@ -439,7 +439,7 @@ void LMTmesh::na_study(){
   
 }
 
-void LMTmesh::init_indexing(){
+void SpamTree::init_indexing(){
   
   Zblock = arma::field<arma::sp_mat> (n_blocks);
   parents_indexing = arma::field<arma::uvec> (n_blocks);
@@ -475,7 +475,7 @@ void LMTmesh::init_indexing(){
   
 }
 
-void LMTmesh::init_finalize(){
+void SpamTree::init_finalize(){
   
   message("[init_finalize] dim_by_parent, parents_coords, children_coords");
   
@@ -550,7 +550,7 @@ void LMTmesh::init_finalize(){
   }
 }
 
-void LMTmesh::get_loglik_w(MeshData& data){
+void SpamTree::get_loglik_w(MeshData& data){
   // S=standard gibbs (cheapest), P=residual process, R=residual process using recursive functions
   switch(use_alg){
   case 'S':
@@ -565,7 +565,7 @@ void LMTmesh::get_loglik_w(MeshData& data){
   }
 }
 
-void LMTmesh::get_loglik_w_std(MeshData& data){
+void SpamTree::get_loglik_w_std(MeshData& data){
   start = std::chrono::steady_clock::now();
   if(verbose){
     Rcpp::Rcout << "[get_loglik_w] entering \n";
@@ -616,7 +616,7 @@ void LMTmesh::get_loglik_w_std(MeshData& data){
 }
 
 
-void LMTmesh::get_loglik_w_rec(MeshData& data){
+void SpamTree::get_loglik_w_rec(MeshData& data){
   start = std::chrono::steady_clock::now();
   if(verbose){
     Rcpp::Rcout << "[get_loglik_w] entering \n";
@@ -652,12 +652,12 @@ void LMTmesh::get_loglik_w_rec(MeshData& data){
 }
 
 
-void LMTmesh::theta_transform(const MeshData& data){
+void SpamTree::theta_transform(const MeshData& data){
   cparams = data.theta;
   Dmat = arma::zeros(1,1);
 }
 
-void LMTmesh::get_recursive_funcs(){
+void SpamTree::get_recursive_funcs(){
 
   for(int i=0; i<n_blocks; i++){
     int u = block_names(i) - 1;
@@ -699,7 +699,7 @@ void LMTmesh::get_recursive_funcs(){
 
 }
 
-void LMTmesh::init_multires(){
+void SpamTree::init_multires(){
   //Kxx_chol = arma::field<arma::mat> (n_blocks);
   param_data.Kxx_invchol = arma::field<arma::mat> (n_blocks); // storing the inv choleskys of {parents(w), w} (which is parent for children(w))
   param_data.Rcc_invchol = arma::field<arma::mat> (n_blocks); 
@@ -722,7 +722,7 @@ void LMTmesh::init_multires(){
 
 }
 
-void LMTmesh::get_loglik_comps_w(MeshData& data){
+void SpamTree::get_loglik_comps_w(MeshData& data){
   // S=standard gibbs (cheapest), P=residual process, R=residual process using recursive functions
   switch(use_alg){
   case 'S':
@@ -737,7 +737,7 @@ void LMTmesh::get_loglik_comps_w(MeshData& data){
   }
 }
 
-void LMTmesh::get_loglik_comps_w_std(MeshData& data){
+void SpamTree::get_loglik_comps_w_std(MeshData& data){
   start_overall = std::chrono::steady_clock::now();
   message("[get_loglik_comps_w] start. ");
   
@@ -860,7 +860,7 @@ void LMTmesh::get_loglik_comps_w_std(MeshData& data){
   }
 }
 
-void LMTmesh::get_loglik_comps_w_rec(MeshData& data){
+void SpamTree::get_loglik_comps_w_rec(MeshData& data){
   start_overall = std::chrono::steady_clock::now();
   message("[get_loglik_comps_w] start. ");
   
@@ -920,7 +920,7 @@ void LMTmesh::get_loglik_comps_w_rec(MeshData& data){
   }
 }
 
-void LMTmesh::gibbs_sample_w(){
+void SpamTree::gibbs_sample_w(){
   // S=standard gibbs (cheapest), P=residual process, R=residual process using recursive functions
   switch(use_alg){
   case 'S':
@@ -935,7 +935,7 @@ void LMTmesh::gibbs_sample_w(){
   }
 }
 
-void LMTmesh::gibbs_sample_w_std(){
+void SpamTree::gibbs_sample_w_std(){
   // keep seed
   if(verbose & debug){
     start_overall = std::chrono::steady_clock::now();
@@ -1032,7 +1032,7 @@ void LMTmesh::gibbs_sample_w_std(){
   
 }
 
-void LMTmesh::gibbs_sample_w_rpx(){
+void SpamTree::gibbs_sample_w_rpx(){
   if(verbose & debug){
     start_overall = std::chrono::steady_clock::now();
     Rcpp::Rcout << "[gibbs_sample_w_rpx] " << endl;
@@ -1138,7 +1138,7 @@ void LMTmesh::gibbs_sample_w_rpx(){
   }
 }
 
-void LMTmesh::gibbs_sample_w_rec(){
+void SpamTree::gibbs_sample_w_rec(){
   if(verbose & debug){
     start_overall = std::chrono::steady_clock::now();
     Rcpp::Rcout << "[gibbs_sample_w_rec] " << endl;
@@ -1232,7 +1232,7 @@ void LMTmesh::gibbs_sample_w_rec(){
   }
 }
 
-void LMTmesh::predict(){
+void SpamTree::predict(){
   // S=standard gibbs (cheapest), P=residual process, R=residual process using recursive functions
   switch(use_alg){
   case 'S':
@@ -1247,7 +1247,7 @@ void LMTmesh::predict(){
   }
 }
 
-void LMTmesh::predict_std(){
+void SpamTree::predict_std(){
   start_overall = std::chrono::steady_clock::now();
   message("[predict] start. ");
   
@@ -1316,7 +1316,7 @@ void LMTmesh::predict_std(){
   
 }
 
-void LMTmesh::predict_rec(){
+void SpamTree::predict_rec(){
   start_overall = std::chrono::steady_clock::now();
   message("[predict] start. ");
   
@@ -1395,7 +1395,7 @@ void LMTmesh::predict_rec(){
   
 }
 
-void LMTmesh::gibbs_sample_beta(){
+void SpamTree::gibbs_sample_beta(){
   message("[gibbs_sample_beta]");
   start = std::chrono::steady_clock::now();
   
@@ -1414,7 +1414,7 @@ void LMTmesh::gibbs_sample_beta(){
   }
 }
 
-void LMTmesh::gibbs_sample_tausq(){
+void SpamTree::gibbs_sample_tausq(){
   start = std::chrono::steady_clock::now();
   
   arma::mat yrr = y_available - X_available * Bcoeff - Zw.rows(na_ix_all);
@@ -1434,7 +1434,7 @@ void LMTmesh::gibbs_sample_tausq(){
   }
 }
 
-void LMTmesh::gibbs_sample_sigmasq(){
+void SpamTree::gibbs_sample_sigmasq(){
   start = std::chrono::steady_clock::now();
   
   double oldsigmasq = sigmasq;
@@ -1493,20 +1493,20 @@ void LMTmesh::gibbs_sample_sigmasq(){
 }
 
 
-void LMTmesh::theta_update(MeshData& data, const arma::vec& new_param){
+void SpamTree::theta_update(MeshData& data, const arma::vec& new_param){
   message("[theta_update] Updating theta");
   data.theta = new_param;
 }
 
-void LMTmesh::tausq_update(double new_tausq){
+void SpamTree::tausq_update(double new_tausq){
   tausq_inv = 1.0/new_tausq;
 }
 
-void LMTmesh::beta_update(const arma::vec& new_beta){ 
+void SpamTree::beta_update(const arma::vec& new_beta){ 
   Bcoeff = new_beta;
 }
 
-void LMTmesh::accept_make_change(){
+void SpamTree::accept_make_change(){
   // theta has changed
   std::swap(param_data, alter_data);
 }

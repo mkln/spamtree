@@ -1,3 +1,4 @@
 useDynLib(spamtree, .registration=TRUE)
 importFrom(Rcpp, evalCpp)
-exportPattern("^[[:alpha:]]+")
+
+export("prebuild", "precision_matrix", "prior_sample", "spamtree")

@@ -5,7 +5,8 @@ Version: 0.1
 Date: 2020-04-01
 Author: M. Peruzzi
 Maintainer: M. Peruzzi <mklnsrc@gmail.com>
-Description: More about what it does (maybe more than one line)
+Description: Methods for fitting Bayesian spatial linear latent Gaussian Process models via SpamTrees. 
 License: CC BY 4.0
-Imports: Rcpp (>= 1.0.3)
-LinkingTo: Rcpp, RcppArmadillo, RcppEigen, FNN
+Imports: Rcpp (>= 1.0.3), FNN, dplyr, tidyr, magrittr, Matrix
+LinkingTo: Rcpp, RcppArmadillo, RcppEigen
+RoxygenNote: 7.1.0

@@ -1,4 +1,5 @@
-spamtree_prebuild <- function(y, X, Z, coords, 
+#' @export
+prebuild <- function(y, X, Z, coords, 
                               cell_size=25, K=rep(2, ncol(coords)),
                               mcmc        = list(keep=1000, burn=0, thin=1),
                               num_threads = 4,
@@ -20,7 +21,8 @@ spamtree_prebuild <- function(y, X, Z, coords,
             o      o
               \\   /
                 o\n\n
- Building...")
+\n
+Building...")
   
   if(1){
     mcmc_keep <- mcmc$keep
@@ -230,7 +232,7 @@ spamtree_prebuild <- function(y, X, Z, coords,
   
   cat("Building graph.\n")
   gtime <- system.time({
-    parents_children <- multires_graph(parchi_map %>% as.matrix(), non_empty_blocks)
+    parents_children <- spamtree:::multires_graph(parchi_map %>% as.matrix(), non_empty_blocks)
   })
   #cat("Graph total time: ", as.numeric(gtime["elapsed"]), "\n")
   #npars <- parents_children$parents %>% lapply(length) %>% unlist()

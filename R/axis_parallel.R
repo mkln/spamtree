@@ -2,7 +2,7 @@ axis_parallel <- function(coordsmat, thresholds, n_threads){
   
   tessellate_time <- system.time({
     ncol_coords <- ncol(coordsmat)-1
-  num_blocks_by_coord <- part_axis_parallel_lmt(coordsmat[,-ncol(coordsmat)], thresholds)
+  num_blocks_by_coord <- spamtree:::part_axis_parallel_lmt(coordsmat[,-ncol(coordsmat)], thresholds)
   blocks_by_coord <- num_blocks_by_coord %>% apply(2, factor)
   colnames(blocks_by_coord) <- colnames(num_blocks_by_coord) <- paste0("L", 1:ncol_coords)
   

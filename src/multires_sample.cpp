@@ -36,6 +36,7 @@ void expand_grid_with_values_(arma::umat& locs,
   }
 }
 
+//[[Rcpp::export]]
 Eigen::SparseMatrix<double> spamtree_Cinv(
     const arma::mat& coords, 
     const arma::uvec& blocking,
@@ -50,8 +51,6 @@ Eigen::SparseMatrix<double> spamtree_Cinv(
     const arma::mat& Dmat,
     
     int num_threads = 1,
-    
-    bool cache=false,
     
     bool verbose=false,
     bool debug=false){
@@ -161,8 +160,6 @@ Eigen::VectorXd spamtree_sample(
     const arma::mat& Dmat,
     
     int num_threads = 1,
-    
-    bool cache=false,
     
     bool verbose=false,
     bool debug=false){

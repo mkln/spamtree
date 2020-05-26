@@ -44,7 +44,7 @@ first_steps <- system.time({
     timings[1] <- timings[1] + 
       system.time({
         
-    thresholds_knots <- 1:dd %>% lapply(function(i) kthresholds(coords_availab[,i], axis_cell_size[i] * K[i]^(res-1)))
+    thresholds_knots <- 1:dd %>% lapply(function(i) spamtree:::kthresholds(coords_availab[,i], axis_cell_size[i] * K[i]^(res-1)))
 
     grid_size <- thresholds_knots %>% lapply(length) %>% unlist() %>% prod()
     if(grid_size < nrow(cx)){
@@ -67,7 +67,7 @@ first_steps <- system.time({
     # fixed threshold regularly on each axis
     #thresholds_res <- 1:dd %>% lapply(function(i) seq(minx-1e-6, maxx+1e-6, length.out=2^(res-1) + 1))
     # based on quantiles -- hopefully more uniform partitioning
-    thresholds_res <- 1:dd %>% lapply(function(i) kthresholds(coords_availab[,i], K[i]^(res-1)))
+    thresholds_res <- 1:dd %>% lapply(function(i) spamtree:::kthresholds(coords_availab[,i], K[i]^(res-1)))
     thresholds_list[[res]] <- thresholds_res
     
     coords_res <- coords_knots %>% as.matrix() %>% 
@@ -131,7 +131,7 @@ last_steps <- system.time({
     right_join(data.frame(block_unnorm = 1:max(.$block_unnorm)), by=c("block_unnorm"="block_unnorm"))
   translator[is.na(translator)] <- 0
   
-  parchi_map <- number_revalue(parchi_original %>% as.matrix(), translator$block_unnorm, translator$block)
+  parchi_map <- spamtree:::number_revalue(parchi_original %>% as.matrix(), translator$block_unnorm, translator$block)
   colnames(parchi_map) <- colnames(parchi_original)
   parchi_map[parchi_map == 0] <- NA
   
@@ -192,154 +192,3 @@ last_steps <- system.time({
               thresholds = thresholds_list))
 }
 
-
-
-make_tree_old <- function(coords, na_which, axis_cell_size=c(5,5)){
-  #Rcpp::sourceCpp("src/multires_utils.cpp")
-  
-  #coords <- rnorm(1000, 0, 2) %>% matrix(ncol=2) %>% apply(2, function(x) (x-min(x))/(max(x)-min(x)))
-  #colnames(coords) <- c("Var1", "Var2")
-  
-  coords_allres <- coords %>% as.data.frame()
-  coords_missing <- coords[is.na(na_which),]
-  coords_availab <- coords[!is.na(na_which),]
-  
-  
-  nr <- nrow(coords_availab)
-  dd <- ncol(coords_availab) - 1
-  
-  minx <- coords_availab[,1:dd] %>% min()
-  maxx <- coords_availab[,1:dd] %>% max()
-  
-  cx <- coords_availab %>% as.data.frame()
-  
-  coords_refset <- cx %>% mutate(block=NA, res=NA, part=NA) %>%
-    dplyr::filter(Var1 < minx)
-  
-  cell_size <- prod(axis_cell_size)
-  n_u_cells <- nr/cell_size
-  
-  #LL <- floor( log(n_u_cells)/log(4)  )
-  thresholds_list <- list()
-  max_block_number <- 0
-  res <- 1
-  #for(res in 1:LL){
-  
-  while(nrow(cx) > 0){
-    # first, tessellate to find locations that are spread out. select one for each cell.
-    # second, with the resulting subsample then actually split into blocks
-    
-    # generate threshold to make small cells from which we will sample 1 location
-    # fixed threshold regularly on each axis
-    #thresholds_knots <- 1:dd %>% lapply(function(i) seq(minx-1e-6, maxx+1e-6, length.out=axis_cell_size[i] * 2^(res-1) + 1))
-    # based on quantiles -- hopefully more uniform partitioning
-    
-    thresholds_knots <- 1:dd %>% lapply(function(i) kthresholds(coords_availab[,i], axis_cell_size[i] * 2^(res-1)))
-    
-    grid_size <- thresholds_knots %>% lapply(length) %>% unlist() %>% prod()
-    if(grid_size < nrow(cx)){
-      # if grid is too thin considering available coordinates, skip this and partition directly
-      coords_knots <- cx %>% as.matrix() %>%
-        axis_parallel(thresholds_knots, 4) %>%
-        #mutate(block = max_block_number + block) %>%
-        group_by(block) %>% summarise(ix = ix[sample(1:n(), 1)])
-      
-      coords_knots %<>% as.data.frame() %>% left_join(cx, by=c("ix"="ix")) %>% dplyr::select(contains("Var"), ix)
-    } else {
-      coords_knots <- cx 
-    }
-    
-    
-    # now take the subsample and make the partition
-    # fixed threshold regularly on each axis
-    #thresholds_res <- 1:dd %>% lapply(function(i) seq(minx-1e-6, maxx+1e-6, length.out=2^(res-1) + 1))
-    # based on quantiles -- hopefully more uniform partitioning
-    thresholds_res <- 1:dd %>% lapply(function(i) kthresholds(coords_availab[,i], 2^(res-1)))
-    thresholds_list[[res]] <- thresholds_res
-    
-    coords_res <- coords_knots %>% as.matrix() %>% 
-      axis_parallel(thresholds_res, 4) %>%
-      mutate(block = max_block_number + block,
-             res = res) %>%
-      dplyr::select(contains("Var"), ix, block, res, part)
-    max_block_number <- coords_res %>% pull(block) %>% max()
-    
-    
-    # move selected locations to the reference set
-    cx %<>% dplyr::filter(!(ix %in% coords_res$ix))
-    coords_refset %<>% bind_rows(coords_res)
-    
-    # keep track of overall tessellation
-    blockname = sprintf("block_res%02d", res)
-    coords_keeptrack <- coords_allres %>% 
-      dplyr::select(contains("Var"), ix) %>% 
-      as.matrix() %>%
-      axis_parallel(thresholds_res, 4) %>%
-      rename(!!sym(blockname) := block) %>%
-      dplyr::select(ix, !!sym(blockname))
-    
-    coords_allres %<>% left_join(coords_keeptrack, by=c("ix"="ix"))
-    
-    res <- res + 1
-    
-    
-  }
-  
-  # final step: manage missing locations
-  if(nrow(coords_missing) > 0){
-    coords_res_miss <- coords_missing %>% as.matrix() %>%
-      axis_parallel(thresholds_res, 4) %>%
-      mutate(block = max_block_number + block,
-             res = res) %>%
-      dplyr::select(contains("Var"), ix, block, res, part)
-    max_block_number <- coords_res %>% pull(block) %>% max()
-    coords_all <- bind_rows(coords_refset, coords_res_miss)
-  } else {
-    coords_all <- coords_refset
-  }
-  
-  
-  # keep track of overall tessellation
-  blockname = sprintf("block_res%02d", res)
-  coords_keeptrack <- coords_allres %>% 
-    dplyr::select(contains("Var"), ix) %>% 
-    as.matrix() %>%
-    axis_parallel(thresholds_res, 4) %>%
-    rename(!!sym(blockname) := block) %>%
-    dplyr::select(ix, !!sym(blockname))
-  
-  coords_allres %<>% left_join(coords_keeptrack, by=c("ix"="ix"))
-  
-  
-  # now that we have the multiresolution partitioning, 
-  # we create a table with the parent-child relationships
-  
-  relate <- coords_allres %>% dplyr::select(contains("Var"), ix, contains("block_res")) %>%
-    left_join(coords_all %>% dplyr::select(ix, res, block, part), by=c("ix"="ix"))
-  max_block_number <- 0
-  for(i in 1:(res)){
-    blockname <- sprintf("block_res%02d", i)
-    relate %<>% mutate(!!sym(blockname) := !!sym(blockname) + max_block_number)
-    max_block_number <- max(relate %>% pull(!!sym(blockname)))
-  }
-  
-  parchi_original <- relate[,sprintf("block_res%02d", 1:max(coords_all$res))] %>% dplyr::select(contains("block_res")) %>% unique()
-  translator <- relate %>% mutate(block_unnorm = relate %>% apply(1, function(rr) rr[sprintf("block_res%02d", rr["res"])])) %>%
-    dplyr::select(block_unnorm, block) %>% unique() %>% 
-    right_join(data.frame(block_unnorm = 1:max(.$block_unnorm)), by=c("block_unnorm"="block_unnorm"))
-  translator[is.na(translator)] <- 0
-  
-  parchi_map <- number_revalue(parchi_original %>% as.matrix(), translator$block_unnorm, translator$block)
-  colnames(parchi_map) <- colnames(parchi_original)
-  parchi_map[parchi_map == 0] <- NA
-  
-  parchi_map <- parchi_map %>% as.data.frame() %>% 
-    arrange(!!!syms(sprintf("block_res%02d", 1:(ncol(parchi_map)-1))))
-  
-  #366 368 383 409 456 472 484 502 505 518 546 548 574
-  #coords_refset %>% ggplot(aes(Var1, Var2, label=block)) + geom_text(aes(color=factor(block))) + theme(legend.position= "none") + facet_grid(~ res)
-  
-  return(list(coords_blocking = coords_all,
-              parchi_map = parchi_map %>% unique(),
-              thresholds = thresholds_list))
-}

@@ -91,9 +91,9 @@ Rcpp::List mesh_multires_mcmc(
 
   Rcpp::Rcout << set_unif_bounds << endl;
   
-  LMTmesh mesh = LMTmesh();
+  SpamTree mesh = SpamTree();
   
-  mesh = LMTmesh(y, X, Z, coords, blocking,
+  mesh = SpamTree(y, X, Z, coords, blocking,
                   
                   parents, children, layer_names, layer_gibbs_group,
                   indexing,

@@ -1,4 +1,5 @@
-rspamtree <- function(coords, theta,
+#' @export
+prior_sample <- function(coords, theta,
                      cell_size=25, K=rep(2, ncol(coords)),
                      num_threads = 4,
                      verbose=F, debug=F){
@@ -29,7 +30,7 @@ rspamtree <- function(coords, theta,
   non_empty_blocks <- rep(1, nrow(parchi_map))
   cat("Building graph.\n")
   gtime <- system.time({
-    parents_children <- multires_graph(parchi_map %>% as.matrix(), non_empty_blocks)
+    parents_children <- spamtree:::multires_graph(parchi_map %>% as.matrix(), non_empty_blocks)
   })
   
   parents                      <- parents_children[["parents"]] 
@@ -41,11 +42,12 @@ rspamtree <- function(coords, theta,
   Dmat <- matrix(0)
   
   cx <- coords_blocking %>% dplyr::select(contains("Var")) %>% as.matrix()
-  sampled <- spamtree_sample(cx, blocking,
-    parents, block_names, indexing, 
-    theta, Dmat,
-    num_threads,
-    verbose, debug)
+  sampled <- spamtree:::spamtree_sample(cx, blocking,
+                            parents, block_names, indexing, 
+                            theta, Dmat,
+                            num_threads,
+                            verbose, debug)
   
   return(sampled[order(coords_blocking$ix)])
 }
+
