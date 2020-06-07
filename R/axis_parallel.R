@@ -1,28 +1,35 @@
 axis_parallel <- function(coordsmat, thresholds, n_threads){
   
   tessellate_time <- system.time({
-    ncol_coords <- ncol(coordsmat)-1
-  num_blocks_by_coord <- spamtree:::part_axis_parallel_lmt(coordsmat[,-ncol(coordsmat)], thresholds)
+  
+  ncol_coords <- ncol(coordsmat)-1
+  num_blocks_by_coord <- spamtree:::part_axis_parallel_lmt(coordsmat[,-ncol(coordsmat),drop=F], thresholds)
   blocks_by_coord <- num_blocks_by_coord %>% apply(2, factor)
+  dim(blocks_by_coord) <- dim(num_blocks_by_coord)
   colnames(blocks_by_coord) <- colnames(num_blocks_by_coord) <- paste0("L", 1:ncol_coords)
   
   
-  block <- as.data.frame(blocks_by_coord) %>% 
-    as.list() %>% 
-    interaction() %>%
-    factor() %>% 
-    as.numeric()
+  if(dim(blocks_by_coord)[1] == 1){
+    block <- 1
+  } else {
+    block <- as.data.frame(blocks_by_coord) %>% 
+      as.list() %>% 
+      interaction() %>%
+      factor() %>% 
+      as.numeric()
+  }
   
   #partblock <- num_blocks_by_coord %>% col_to_string() %>% #
     ##apply(2, function(x) as.character((x-1) %% 2)) %>%
   #  as.data.frame() %>% as.list() %>% interaction() %>% as.numeric()
   
-  blockdf <- data.frame(num_blocks_by_coord, 
-                        block = block#,
-                        #part = partblock
-                        )
+  #blockdf <- data.frame(num_blocks_by_coord, 
+  #                      block = block) 
+  
+  blockdf <- num_blocks_by_coord %>% cbind(block) %>% as.data.frame()
   
   result <- cbind(coordsmat, blockdf)
+  
   })
   
   

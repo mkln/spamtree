@@ -1,15 +1,16 @@
-#include "mesh_multires.h"
+#include "spamtree_model.h"
 #include "multires_utils.h"
 #include "interrupt_handler.h"
 
 //[[Rcpp::export]]
-Rcpp::List mesh_multires_mcmc(
+Rcpp::List spamtree_mcmc(
     const arma::mat& y, 
     const arma::mat& X, 
     const arma::mat& Z,
     
     const arma::mat& coords, 
     const arma::uvec& blocking,
+    const arma::uvec& res_is_ref,
     
     const arma::field<arma::uvec>& parents,
     const arma::field<arma::uvec>& children,
@@ -49,7 +50,7 @@ Rcpp::List mesh_multires_mcmc(
     bool sample_w=true,
     bool sample_predicts=true){
   
-  omp_set_num_threads(num_threads);
+  //omp_set_num_threads(num_threads);
   std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
   std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
   
@@ -77,30 +78,36 @@ Rcpp::List mesh_multires_mcmc(
   arma::mat set_unif_bounds = set_unif_bounds_in;
   
   if(d == 2){
-    npars = 1 + 1; // sigmasq + phi
+    if(q > 2){
+      npars = 1 + 3;
+    } else {
+      npars = 1 + 1;
+    }
   } else {
-    npars = 3 + 1; // sigmasq + alpha + beta + phi
+    if(q > 2){
+      npars = 1+5;
+    } else {
+      npars = 1+3; // sigmasq + alpha + beta + phi
+    }
   }
   
-  if(q > 1){
-    k = q * (q-1)/2;
-    npars += k; // for xCovHUV + Dmat for variables (excludes sigmasq)
-    Rcpp::Rcout << "Multivariate multiresolution not implemented yet.\n";
-    throw 1;
-  }
-
+  k = q * (q-1)/2;
+  
+  Rcpp::Rcout << "Number of pars: " << npars << " plus " << k << " for multivariate\n"; 
+  npars += k; // for xCovHUV + Dmat for variables (excludes sigmasq)
+  
   Rcpp::Rcout << set_unif_bounds << endl;
   
   SpamTree mesh = SpamTree();
   
-  mesh = SpamTree(y, X, Z, coords, blocking,
+  mesh = SpamTree("gaussian", y, X, Z, coords, blocking, res_is_ref,
                   
                   parents, children, layer_names, layer_gibbs_group,
                   indexing,
                   
                   start_w, beta, theta, 1.0/tausq, sigmasq,
                   
-                  use_alg,
+                  use_alg, num_threads,
                   verbose, debug);
   
   
@@ -112,7 +119,7 @@ Rcpp::List mesh_multires_mcmc(
   
   arma::vec grps = arma::unique(layer_gibbs_group);
   int n_res = grps.n_elem;
-  arma::cube eta_rpx_mcmc = arma::zeros(coords.n_rows, mcmc_keep, n_res);
+  arma::field<arma::cube> eta_rpx_mcmc(mcmc_keep);
   
   // field avoids limit in size of objects -- ideally this should be a cube
   arma::field<arma::mat> w_mcmc(mcmc_keep);
@@ -122,12 +129,14 @@ Rcpp::List mesh_multires_mcmc(
   for(int i=0; i<mcmc_keep; i++){
     w_mcmc(i) = arma::zeros(mesh.w.n_rows, q);
     yhat_mcmc(i) = arma::zeros(mesh.y.n_rows, 1);
+    eta_rpx_mcmc(i) = arma::zeros(coords.n_rows, q, n_res);
   }
   
   mesh.get_loglik_comps_w( mesh.param_data );
   mesh.get_loglik_comps_w( mesh.alter_data );
   
   arma::vec param = mesh.param_data.theta;
+  arma::vec predict_param = param;
   double current_loglik = tempr*mesh.param_data.loglik_w;
   if(verbose & debug){
     Rcpp::Rcout << "starting from ll: " << current_loglik << endl; 
@@ -146,6 +155,8 @@ Rcpp::List mesh_multires_mcmc(
   int mcmc = mcmc_thin*mcmc_keep + mcmc_burn;
   int msaved = 0;
   bool interrupted = false;
+  
+  
   Rcpp::Rcout << "Running MCMC for " << mcmc << " iterations." << endl;
   
   arma::vec sumparam = arma::zeros(npars);
@@ -176,8 +187,15 @@ Rcpp::List mesh_multires_mcmc(
       
       start = std::chrono::steady_clock::now();
       if(sample_w){
-        mesh.gibbs_sample_w();
-        mesh.get_loglik_w(mesh.param_data);
+        mesh.deal_with_w();
+        mesh.get_loglik_w(mesh.param_data);/*
+        Rcpp::Rcout << mesh.param_data.logdetCi << " " 
+                    << arma::accu(mesh.param_data.loglik_w_comps) 
+                    << endl;
+        mesh.get_loglik_comps_w_std(mesh.param_data);
+        Rcpp::Rcout << mesh.param_data.logdetCi << " " 
+                    << arma::accu(mesh.param_data.loglik_w_comps) 
+                    << endl;*/
         current_loglik = tempr*mesh.param_data.loglik_w;
       }
       
@@ -202,6 +220,7 @@ Rcpp::List mesh_multires_mcmc(
         //current_loglik = mesh.param_data.loglik_w;
         //Rcpp::Rcout << "recalc: " << mesh.param_data.loglik_w << "\n";
       }
+      
       end = std::chrono::steady_clock::now();
       if(verbose_mcmc & sample_sigmasq & verbose){
         Rcpp::Rcout << "[sigmasq] "
@@ -214,6 +233,7 @@ Rcpp::List mesh_multires_mcmc(
       
       ll_upd_msg = current_loglik;
       start = std::chrono::steady_clock::now();
+      bool accepted = true;
       if(sample_theta){
         propos_count++;
         propos_count_local++;
@@ -307,13 +327,15 @@ Rcpp::List mesh_multires_mcmc(
         }
       }
       if((mesh.predicting == true) & sample_predicts){
-        //Rcpp::Rcout << "[predict] with current theta: " << mesh.param_data.theta.t() << " vs old " << mesh.alter_data.theta.t() << endl;
-        mesh.predict();
+        // tell predict() if theta has changed because if not, we can avoid recalculating
+        bool need_update = arma::accu(abs(param - predict_param) > 1e-05);
+        mesh.predict(need_update);
+        predict_param = param;
       }
       
       start = std::chrono::steady_clock::now();
       if(sample_beta){
-        mesh.gibbs_sample_beta();
+        mesh.deal_with_beta();
       }
       end = std::chrono::steady_clock::now();
       if(verbose_mcmc & sample_beta & verbose){
@@ -378,7 +400,6 @@ Rcpp::List mesh_multires_mcmc(
         }
       }
       
-      
       //save
       if(mx >= 0){
         if(mx % mcmc_thin == 0){
@@ -389,13 +410,13 @@ Rcpp::List mesh_multires_mcmc(
           llsave(msaved) = current_loglik;
           
           w_mcmc(msaved) = mesh.w;
-          yhat_mcmc(msaved) = mesh.X * mesh.Bcoeff + mesh.Zw;
-          
-          eta_rpx_mcmc.col(msaved) = mesh.eta_rpx;
+          yhat_mcmc(msaved) = mesh.X * mesh.Bcoeff + mesh.Zw + pow(mesh.tausq_inv, -.5) * arma::randn(mesh.X.n_rows);
+          eta_rpx_mcmc(msaved) = mesh.eta_rpx;
           
           msaved++;
         }
       }
+      
     }
     
     end_all = std::chrono::steady_clock::now();
@@ -414,10 +435,10 @@ Rcpp::List mesh_multires_mcmc(
       Rcpp::Named("theta_mcmc") = theta_mcmc,
       Rcpp::Named("eta_rpx") = eta_rpx_mcmc,
       Rcpp::Named("paramsd") = paramsd,
+      Rcpp::Named("converged") = mesh.converged,
+      Rcpp::Named("block_ct_obs") = mesh.block_ct_obs,
       
-      Rcpp::Named("mcmc_time") = mcmc_time/1000.0,
-      Rcpp::Named("parents_indexing") = mesh.parents_indexing,
-      Rcpp::Named("children_indexing") = mesh.children_indexing
+      Rcpp::Named("mcmc_time") = mcmc_time/1000.0
     );
     
   } catch (...) {
@@ -432,4 +453,222 @@ Rcpp::List mesh_multires_mcmc(
   }
   
 }
+
+//[[Rcpp::export]]
+Rcpp::List spamtree_bfirls(
+    const std::string& family,
+    const arma::mat& y, 
+    const arma::mat& X, 
+    const arma::mat& Z,
+    
+    const arma::mat& coords, 
+    const arma::uvec& blocking,
+    const arma::uvec& res_is_ref,
+    
+    const arma::field<arma::uvec>& parents,
+    const arma::field<arma::uvec>& children,
+    
+    const arma::vec& layer_names,
+    const arma::vec& layer_gibbs_group,
+    
+    const arma::field<arma::uvec>& indexing,
+    
+    const arma::mat& start_w,
+    const arma::vec& theta,
+    const arma::vec& beta,
+    const double& tausq,
+    const double& sigmasq,
+    
+    int maxiter = 100,
+    
+    int num_threads = 1,
+    
+    
+    bool verbose=false,
+    bool debug=false,
+    bool printall=false,
+    
+    bool sample_beta=true,
+    bool sample_w=true,
+    bool sample_predicts=true){
+  
+  omp_set_num_threads(num_threads);
+  std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+  std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+  
+  std::chrono::steady_clock::time_point start_all = std::chrono::steady_clock::now();
+  std::chrono::steady_clock::time_point end_all = std::chrono::steady_clock::now();
+
+  std::chrono::steady_clock::time_point tick = std::chrono::steady_clock::now();
+  
+  int n = coords.n_rows;
+  int d = coords.n_cols;
+  int q = Z.n_cols;
+  
+  int k;
+  int npars;
+  double dlim=0;
+  Rcpp::Rcout << "d = " << d << ", q = " << q << ".\n";
+  
+  
+  SpamTree mesh = SpamTree();
+  
+  mesh = SpamTree(family, y, X, Z, coords, blocking, res_is_ref,
+                  
+                  parents, children, layer_names, layer_gibbs_group,
+                  indexing,
+                  
+                  start_w, beta, theta, 1.0/tausq, sigmasq,
+                  
+                  'I', num_threads,
+                  verbose, debug);
+  
+  arma::vec delta_iter = arma::zeros(maxiter);
+  //arma::mat w_iter = arma::zeros(coords.n_rows, maxiter);
+  //arma::mat b_iter = arma::zeros(X.n_cols, maxiter);
+  arma::vec Bcoeff_previous = arma::zeros(X.n_cols);
+  arma::vec w_previous = arma::ones(mesh.n * Z.n_cols);
+  
+  
+  mesh.get_loglik_comps_w( mesh.param_data );
+      
+  bool interrupted = false;
+  
+  Rcpp::Rcout << "Running BF-IRLS for a max " << maxiter << " iterations." << endl;
+  double check_start = 0;
+  start_all = std::chrono::steady_clock::now();
+  int m=0; int mx=0; int num_chol_fails=0;
+  try { 
+    for(m=0; m<maxiter; m++){
+      
+      if(printall){
+        tick = std::chrono::steady_clock::now();
+      }
+      
+      start = std::chrono::steady_clock::now();
+      if(sample_w){
+        mesh.deal_with_w();
+      }
+      
+      end = std::chrono::steady_clock::now();
+      if(printall & sample_w & verbose){
+        Rcpp::Rcout << "[w] "
+                    << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "us. "; 
+        if(verbose || debug){
+          Rcpp::Rcout << endl;
+        }
+        //mesh.get_loglik_w(mesh.param_data);
+        //Rcpp::Rcout << " >>>> CHECK : " << mesh.param_data.loglik_w << endl;
+      }
+      
+      start = std::chrono::steady_clock::now();
+      if(sample_beta){
+        mesh.deal_with_beta();
+      }
+      end = std::chrono::steady_clock::now();
+      if(printall & sample_beta & verbose){
+        Rcpp::Rcout << "[beta] " 
+                    << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "us. "; 
+        if(verbose || debug){
+          Rcpp::Rcout << endl;
+        }
+      }
+      
+      if(printall){
+        //Rcpp::checkUserInterrupt();
+        interrupted = checkInterrupt();
+        if(interrupted){
+          throw 1;
+        }
+        int itertime = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now()-tick ).count();
+        
+        printf("%5d-th iteration [ %dms ] \n", m+1, itertime);
+        
+        tick = std::chrono::steady_clock::now();
+      } 
+      
+      if(mesh.w.has_nan()){
+        Rcpp::Rcout << "NaN in w" << endl;
+        throw 1;
+      }
+      
+      arma::uvec bix = arma::find(mesh.block_ct_obs > 0) + 1;
+      arma::uvec zerou = arma::zeros<arma::uvec>(1);
+      arma::uvec beta_w_blocks_ix = arma::join_vert(zerou, bix);
+      arma::uvec converged = mesh.converged.elem(beta_w_blocks_ix);
+      
+      double beta_converged = pow(arma::max(abs(mesh.Bcoeff - Bcoeff_previous)), 2);
+      arma::vec w_current = arma::vectorise(arma::trans(mesh.w.rows(mesh.na_ix_all)));
+      double w_converged = pow(arma::max(abs(w_current - w_previous)), 2);
+      
+      w_previous = w_current;
+      Bcoeff_previous = mesh.Bcoeff;
+
+      if((beta_converged < 1e-4) & (w_converged < 1e-4)){
+        printf("BF-IRLS converged.\n");
+        
+        break;
+      }
+      
+      delta_iter(m) = w_converged;
+      //w_iter.col(m) = mesh.w;
+      //b_iter.col(m) = mesh.Bcoeff;
+    }
+    
+    end_all = std::chrono::steady_clock::now();
+    double alg_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_all - start_all).count();
+    
+    if(m == maxiter){
+      //Rcpp::Rcout << "Did not converge. Returning last values.\n" << endl;
+      printf("Did not converge within the specified number of iterations. Returning last values.\n");
+    }
+    
+    mesh.predicting = true;
+    if(sample_predicts){
+      mesh.predict(true);
+    }
+    
+    return Rcpp::List::create(
+      Rcpp::Named("w") = mesh.w,
+      //Rcpp::Named("w_iter") = w_iter,
+      //Rcpp::Named("b_iter") = b_iter,
+      Rcpp::Named("delta_iter") = delta_iter,
+      
+      Rcpp::Named("linear_predictor") = mesh.X * mesh.Bcoeff + mesh.Zw,
+      Rcpp::Named("beta") = mesh.Bcoeff,
+      Rcpp::Named("tausq") = 1.0/mesh.tausq_inv,
+      Rcpp::Named("theta") = mesh.param_data.theta,
+      Rcpp::Named("eta_rpx") = mesh.eta_rpx,
+      
+      Rcpp::Named("iter") = m,
+      Rcpp::Named("alg_time") = alg_time/1000.0,
+      
+      Rcpp::Named("converged") = mesh.converged,
+      Rcpp::Named("block_ct_obs") = mesh.block_ct_obs
+    );
+    
+  } catch (...) {
+    end_all = std::chrono::steady_clock::now();
+    
+    double alg_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_all - start_all).count();
+    
+    printf("BF-IRLS has been interrupted.\n");
+    return Rcpp::List::create(
+      Rcpp::Named("w") = mesh.w,
+      Rcpp::Named("yhat") = mesh.X * mesh.Bcoeff + mesh.Zw,
+      Rcpp::Named("beta") = mesh.Bcoeff,
+      Rcpp::Named("tausq") = 1.0/mesh.tausq_inv,
+      Rcpp::Named("theta") = mesh.param_data.theta,
+      Rcpp::Named("eta_rpx") = mesh.eta_rpx,
+      
+      Rcpp::Named("iter") = m,
+      Rcpp::Named("alg_time") = alg_time/1000.0,
+      
+      Rcpp::Named("converged") = mesh.converged,
+      Rcpp::Named("block_ct_obs") = mesh.block_ct_obs
+    );
+  }
+  
+}
+
 

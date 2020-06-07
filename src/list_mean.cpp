@@ -24,6 +24,35 @@ arma::mat list_mean(const arma::field<arma::mat>& x){
   return result;
 }
 
+//[[Rcpp::export]]
+arma::mat list_cubes_mean(const arma::field<arma::cube>& x, int cslice){
+  // all matrices in x must be the same size.
+  int n = x.n_elem;
+  int nrows = x(0).n_rows;
+  int ncols = x(0).n_cols;
+  int nslices = x(0).n_slices;
+  
+  if(cslice >= nslices){
+    Rcpp::Rcout << "Selected resolution does not exist.\n";
+    throw 1;
+  }
+  
+  arma::mat result = arma::zeros(nrows, ncols);
+  
+#pragma omp parallel for
+  for(int j=0; j<nrows*ncols; j++){
+    //for(int h=0; h<ncols; h++){
+    arma::vec slices = arma::zeros(n);
+    for(int i=0; i<n; i++){
+      arma::mat this_slice = x(i).slice(cslice);
+      slices(i) = this_slice(j);
+    }
+    result(j) = arma::mean(slices);
+    //}
+  }
+  return result;
+}
+
 void prctile_stl(double* in, const int &len, const double &percent, std::vector<double> &range) {
   // Calculates "percent" percentile.
   // Linear interpolation inspired by prctile.m from MATLAB.

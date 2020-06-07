@@ -42,23 +42,24 @@ double xCovHUV_base(double h, double u, double v, const arma::vec& params, int q
   // alpha=0.5
   // gamma=0.5 
   if(dim == 3){
-    if(q == 1){
-      // univariate spacetime -- using Gneiting 2002
-      // multivariate but fixing a_psi2=1, beta_psi2=1 ?
-      // sigmasq + 3 params
+    if(q > 2){
+      // full multivariate
+      // sigmasq + 5 params
       double sigmasq   = params(0);
-      double a_psi1    = params(1);
-      double beta_psi1 = params(2);
-      double c_phi1    = params(3);
-      double psi1_sqrt = sqrt_fpsi(u, a_psi1, beta_psi1); // alpha_psi1=0.5
+      double a_psi2    = params(1);
+      double beta_psi2 = params(2);
+      double a_psi1    = params(3);
+      double beta_psi1 = params(4);
+      double c_phi1    = params(5);
+      double psi2_sqrt = sqrt_fpsi(v,           a_psi2, beta_psi2); // alpha_psi2=0.5
+      double psi1_sqrt = sqrt_fpsi(u/psi2_sqrt, a_psi1, beta_psi1); // alpha_psi1=0.5
       double phi1      = fphi(h/psi1_sqrt, c_phi1); // gamma_phi1=0.5
       
-      return sigmasq / (psi1_sqrt * psi1_sqrt) * phi1;
-      
+      return sigmasq / (psi1_sqrt * psi1_sqrt) * phi1 / psi2_sqrt;
     } else {
       if(q == 2){
         // multivariate but fixing a_psi2=1, beta_psi2=1 ?
-        // sigmasq + 3 params
+        // sigmasq + 3 params + v
         double sigmasq   = params(0);
         double a_psi2    = 1.0;
         double beta_psi2 = 1.0;
@@ -72,53 +73,76 @@ double xCovHUV_base(double h, double u, double v, const arma::vec& params, int q
         
         return sigmasq / (psi1_sqrt * psi1_sqrt) * phi1 / psi2_sqrt;
       } else {
-        // full multivariate
-        // sigmasq + 5 params
+        // univariate spacetime -- using Gneiting 2002
+        // multivariate but fixing a_psi2=1, beta_psi2=1 ?
+        // sigmasq + 3 params
         double sigmasq   = params(0);
-        double a_psi2    = params(1);
-        double beta_psi2 = params(2);
-        double a_psi1    = params(3);
-        double beta_psi1 = params(4);
-        double c_phi1    = params(5);
-        double psi2_sqrt = sqrt_fpsi(v,           a_psi2, beta_psi2); // alpha_psi2=0.5
-        double psi1_sqrt = sqrt_fpsi(u/psi2_sqrt, a_psi1, beta_psi1); // alpha_psi1=0.5
+        double a_psi1    = params(1);
+        double beta_psi1 = params(2);
+        double c_phi1    = params(3);
+        double psi1_sqrt = sqrt_fpsi(u, a_psi1, beta_psi1); // alpha_psi1=0.5
         double phi1      = fphi(h/psi1_sqrt, c_phi1); // gamma_phi1=0.5
         
-        return sigmasq / (psi1_sqrt * psi1_sqrt) * phi1 / psi2_sqrt;
+        return sigmasq / (psi1_sqrt * psi1_sqrt) * phi1;
       }
     }
   } else {
     // no time, only space
-    if(q > 1){// number of variables - which we consider q=k
-      // space-variable nonseparable psi1=const psi2=const in Apanasovich&Genton2010 (4)
+    if(q > 2){// number of variables - which we consider q=k
+      /*
+       // space-variable nonseparable psi1=const psi2=const in Apanasovich&Genton2010 (4)
+       double sigmasq   = params(0);
+       double a_psi4    = params(1);
+       double beta_psi4 = params(2);
+       double a_psi3    = params(3);
+       double beta_psi3 = params(4);
+       double c_phi1    = params(5);
+       double c_phi3    = 1.0;
+       
+       double psi4_sqrt = sqrt_fpsi(v, a_psi4, beta_psi4);
+       double psi3_sqrt = sqrt_fpsi(h, a_psi3, beta_psi3);
+       double phi1      = fphi(h, c_phi1);
+       double phi3      = fphi(v/psi3_sqrt, c_phi3);
+       
+       double psi3_sqrt_powq = psi3_sqrt;
+       for(int i=0; i<q-1; i++){
+       psi3_sqrt_powq *= psi3_sqrt_powq;
+       }
+       return sigmasq / (psi3_sqrt_powq * psi4_sqrt) * phi1 * phi3;*/
+      
+      // multivariate  space. v plays role of time of Gneiting 2002
+      // sigmasq + 3 params
       double sigmasq   = params(0);
-      double a_psi4    = params(1);
-      double beta_psi4 = params(2);
-      double a_psi3    = params(3);
-      double beta_psi3 = params(4);
-      double c_phi1    = params(5);
-      double c_phi3    = 1.0;
+      double a_psi1    = params(1);
+      double beta_psi1 = params(2);
+      double c_phi1    = params(3);
+      double psi1_sqrt = sqrt_fpsi(v, a_psi1, beta_psi1); // alpha_psi1=0.5
+      double phi1      = fphi(h/psi1_sqrt, c_phi1); // gamma_phi1=0.5
       
-      double psi4_sqrt = sqrt_fpsi(v, a_psi4, beta_psi4);
-      double psi3_sqrt = sqrt_fpsi(h, a_psi3, beta_psi3);
-      double phi1      = fphi(h, c_phi1);
-      double phi3      = fphi(v/psi3_sqrt, c_phi3);
-      
-      double psi3_sqrt_powq = psi3_sqrt;
-      for(int i=0; i<q-1; i++){
-        psi3_sqrt_powq *= psi3_sqrt_powq;
-      }
-      return sigmasq / (psi3_sqrt_powq * psi4_sqrt) * phi1 * phi3;
+      return sigmasq / (psi1_sqrt * psi1_sqrt) * phi1;
     } else {
-      // 1 variable no time = exp covariance
-      double sigmasq   = params(0);
-      double phi       = params(1);
-      return sigmasq * fphi(h, phi); 
+      if(q == 2){
+        // multivariate  space. v plays role of time of Gneiting 2002
+        // sigmasq + 1 params + v
+        double sigmasq   = params(0);
+        //double a_psi1    = params(1);
+        //double beta_psi1 = params(2);
+        double c_phi1    = params(1);
+        double psi1_sqrt = 1.0+v;//sqrt(v + 1);//sqrt_fpsi(v, a_psi1, beta_psi1); // alpha_psi1=0.5
+        double phi1      = fphi(h/psi1_sqrt, c_phi1); // gamma_phi1=0.5
+        
+        return sigmasq / (psi1_sqrt * psi1_sqrt) * phi1;
+      } else {
+        // 1 variable no time = exp covariance
+        double sigmasq   = params(0);
+        double phi       = params(1);
+        return sigmasq * fphi(h, phi); 
+      }
+      
     }
   }
-
+  
 }
-
 
 arma::mat vec_to_symmat(const arma::vec& x){
   int k = x.n_elem; // = p(p-1)/2

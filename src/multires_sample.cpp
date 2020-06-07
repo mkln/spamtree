@@ -1,3 +1,4 @@
+/*
 #include <RcppArmadillo.h>
 #include <RcppEigen.h>
 #include <omp.h>
@@ -259,3 +260,4 @@ Eigen::VectorXd spamtree_sample(
 
 
 
+*/
