@@ -20,7 +20,7 @@ arma::sp_mat Zify(const arma::mat& x);
 bool compute_block(bool predicting, int block_ct, bool rfc);
 
 // everything that changes during MCMC
-struct MeshData {
+struct SpamTreeData {
   
   int npars;
   
@@ -47,8 +47,8 @@ struct MeshData {
   arma::vec loglik_w_comps;
   double loglik_w;
   
-  arma::uvec track_chol_fails;
-  bool cholfail;
+  arma::field<arma::cube> Sigi_children;
+  arma::field<arma::mat> Smu_children;
   
 };
 
