@@ -2,6 +2,7 @@
 using namespace std;
 
 
+
 arma::vec armarowsum(const arma::mat& x){
   return arma::sum(x, 1);
 }
@@ -9,6 +10,14 @@ arma::vec armarowsum(const arma::mat& x){
 arma::vec armacolsum(const arma::mat& x){
   return arma::trans(arma::sum(x, 0));
 }
+
+arma::sp_mat spmat_by_diagmat(arma::sp_mat x, const arma::vec& d){
+  for(int j=0; j<x.n_cols; j++){
+    x.col(j) *= d(j);
+  }
+  return x;
+}
+
 
 arma::mat subcube_collapse_via_sum(const arma::cube& mycube, const arma::uvec& whichrows, const arma::uvec& collapse_slices){
   arma::mat result = arma::zeros(whichrows.n_elem, mycube.n_cols);
@@ -58,6 +67,40 @@ arma::sp_mat Zify(const arma::mat& x) {
   return arma::conv_to<arma::sp_mat>::from(X);
 }
 
+arma::sp_mat ZifyMV(const arma::mat& x, const arma::uvec& gix_block){
+  
+  arma::uvec unique_coords = arma::unique(gix_block);
+  
+  int n_blocks = unique_coords.n_elem;
+  int n_rows = x.n_rows;
+  int cdimen = 0;
+  
+  arma::ivec dimcol(n_rows);
+  
+  arma::field<arma::uvec> wvar_by_row(n_rows);
+  for(int i=0; i<n_rows; i++){
+    arma::uvec which_w_var = arma::find(x.row(i) != 0);
+    wvar_by_row(i) = which_w_var;
+    
+    cdimen += which_w_var.n_elem;
+    dimcol(i) = which_w_var.n_elem;
+  }
+  
+  arma::mat X = arma::zeros(n_rows, cdimen);
+  
+  int cdx=0;
+  for(unsigned int i=0; i<n_rows; i++){
+    
+    arma::uvec store_rows = i*arma::ones<arma::uvec>(1);
+    arma::uvec store_cols = arma::regspace<arma::uvec>(cdx, cdx + dimcol(i) - 1);
+    
+    X.submat(store_rows, store_cols) = x.submat(store_rows, wvar_by_row(i));
+    
+    cdx = cdx + dimcol(i);
+  }
+  //qvblock = wvar_by_row;
+  return arma::conv_to<arma::sp_mat>::from(X);
+}
 
 arma::mat join_horiz_mult(const arma::field<arma::mat>& blocks){
   unsigned int n = blocks.n_elem;
@@ -78,7 +121,6 @@ arma::mat join_horiz_mult(const arma::field<arma::mat>& blocks){
   }
   return x;
 }
-
 
 arma::mat join_vert_mult(const arma::field<arma::mat>& blocks){
   unsigned int n = blocks.n_elem;

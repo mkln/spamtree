@@ -41,7 +41,6 @@ arma::vec poisson_variance(const arma::vec& mu){
   return mu;
 }
 
-
 arma::vec irls_bayes_cpp(const arma::vec& y, 
                          const arma::mat& X, 
                          const arma::vec& offset,

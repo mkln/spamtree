@@ -6,7 +6,7 @@
 #include "find_nan.h"
 #include "mh_adapt.h"
 #include "field_v_concatm.h"
-#include "nonseparable_huv_cov.h"
+#include "covariance_functions.h"
 #include "multires_utils.h"
 #include "irls.h"
 

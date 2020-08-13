@@ -1,10 +1,11 @@
-/*
+
 #include <RcppArmadillo.h>
 #include <RcppEigen.h>
 #include <omp.h>
 
 #include "field_v_concatm.h"
-#include "nonseparable_huv_cov.h"
+#include "covariance_functions.h"
+//#include "space_mv_huv_cov.h"
 
 //#define EIGEN_USE_MKL_ALL 1
 
@@ -38,8 +39,9 @@ void expand_grid_with_values_(arma::umat& locs,
 }
 
 //[[Rcpp::export]]
-Eigen::SparseMatrix<double> spamtree_Cinv(
+Rcpp::List spamtree_Cinv(
     const arma::mat& coords, 
+    const arma::uvec& mv_id,
     const arma::uvec& blocking,
     
     const arma::field<arma::uvec>& parents,
@@ -48,7 +50,10 @@ Eigen::SparseMatrix<double> spamtree_Cinv(
     
     const arma::field<arma::uvec>& indexing,
     
-    const arma::vec& theta,
+    const arma::vec& ai1,
+    const arma::vec& ai2,
+    const arma::vec& phi_i,
+    const arma::vec& thetamv,
     const arma::mat& Dmat,
     
     int num_threads = 1,
@@ -61,7 +66,7 @@ Eigen::SparseMatrix<double> spamtree_Cinv(
   omp_set_num_threads(num_threads);
   
   int n_blocks = block_names.n_elem;
-  
+  arma::uvec qvblock_c = mv_id-1;
   arma::field<arma::uvec> parents_indexing(n_blocks);
   
   arma::uvec Adims = arma::zeros<arma::uvec>(n_blocks+1);
@@ -94,15 +99,20 @@ Eigen::SparseMatrix<double> spamtree_Cinv(
   arma::umat Dlocs2 = arma::zeros<arma::umat>(2, Dsize);
   arma::vec Dvals2 = arma::zeros(Dsize);
   
-//***#pragma omp parallel for 
+//#pragma omp parallel for 
   for(int i=0; i<n_blocks; i++){
     int u = block_names(i)-1;
-    arma::mat Kcc = xCovHUV(coords, indexing(u), indexing(u), theta, Dmat, true);
+    arma::mat Kcc = mvCovAG20107(coords, qvblock_c, indexing(u), indexing(u), ai1, ai2, phi_i, thetamv, Dmat, true);
+    
     if(parents(u).n_elem > 0){
-      arma::mat Kxxi = arma::inv_sympd(xCovHUV(coords, parents_indexing(u), parents_indexing(u), theta, Dmat, true));
-      arma::mat Kcx = xCovHUV(coords, indexing(u), parents_indexing(u), theta, Dmat, false);
+      
+      arma::mat Kxx = mvCovAG20107(coords, qvblock_c, parents_indexing(u), parents_indexing(u), ai1, ai2, phi_i, thetamv, Dmat, true);
+      arma::mat Kxxi = arma::inv_sympd(Kxx);
+
+      arma::mat Kcx = mvCovAG20107(coords, qvblock_c, indexing(u), parents_indexing(u), ai1, ai2, phi_i, thetamv, Dmat, false);
       arma::mat Hj = Kcx * Kxxi;
-      arma::mat Rji = arma::inv( arma::chol( arma::symmatu(Kcc - Kcx * Kxxi * Kcx.t()), "lower"));
+      arma::mat Rji = //arma::inv( arma::chol( arma::symmatu(
+        arma::inv_sympd(Kcc - Kcx * Kxxi * Kcx.t());// ), "lower"));
       
       expand_grid_with_values_(Hlocs, Hvals, Adims(i), Adims(i+1),
                                indexing(u), parents_indexing(u), Hj);
@@ -111,7 +121,8 @@ Eigen::SparseMatrix<double> spamtree_Cinv(
                                indexing(u), indexing(u), Rji);
       
     } else {
-      arma::mat Rji = arma::inv( arma::chol( arma::symmatu(Kcc), "lower"));
+      arma::mat Rji = //arma::inv( arma::chol( arma::symmatu(
+        arma::inv_sympd(Kcc); //, "lower"));
       expand_grid_with_values_(Dlocs2, Dvals2, Ddims(i), Ddims(i+1),
                                indexing(u), indexing(u), Rji);
       
@@ -137,18 +148,26 @@ Eigen::SparseMatrix<double> spamtree_Cinv(
   for(int i=0; i<Dlocs2.n_cols; i++){
     tripletList_Dic2.push_back(T(Dlocs2(0, i), Dlocs2(1, i), Dvals2(i)));
   }
-  Eigen::SparseMatrix<double> Dice2(n,n);
-  Dice2.setFromTriplets(tripletList_Dic2.begin(), tripletList_Dic2.end());
+  Eigen::SparseMatrix<double> Di(n,n);
+  Di.setFromTriplets(tripletList_Dic2.begin(), tripletList_Dic2.end());
   
-  Eigen::SparseMatrix<double> L = (I_eig-He).triangularView<Eigen::Lower>().transpose() * Dice2;
+  Eigen::SparseMatrix<double> L = (I_eig-He).triangularView<Eigen::Lower>().transpose();
   
-  return L * L.transpose();
+  Eigen::SparseMatrix<double> Ci = L * Di *  L.transpose();
+  
+  return Rcpp::List::create(
+    Rcpp::Named("Ci") = Ci,
+    Rcpp::Named("H") = He,
+    Rcpp::Named("IminusH") = I_eig - He,
+    Rcpp::Named("Di") = Di
+  );
 }
 
 
 //[[Rcpp::export]]
 Eigen::VectorXd spamtree_sample(
     const arma::mat& coords, 
+    const arma::uvec& mv_id,
     const arma::uvec& blocking,
     
     const arma::field<arma::uvec>& parents,
@@ -157,7 +176,10 @@ Eigen::VectorXd spamtree_sample(
     
     const arma::field<arma::uvec>& indexing,
     
-    const arma::vec& theta,
+    const arma::vec& ai1,
+    const arma::vec& ai2,
+    const arma::vec& phi_i,
+    const arma::vec& thetamv,
     const arma::mat& Dmat,
     
     int num_threads = 1,
@@ -171,6 +193,8 @@ Eigen::VectorXd spamtree_sample(
   
   int n_blocks = block_names.n_elem;
   
+  arma::uvec qvblock_c = mv_id-1;
+
   arma::field<arma::uvec> parents_indexing(n_blocks);
   
   arma::uvec Adims = arma::zeros<arma::uvec>(n_blocks+1);
@@ -201,15 +225,16 @@ Eigen::VectorXd spamtree_sample(
   
   arma::umat Dlocs2 = arma::zeros<arma::umat>(2, Dsize);
   arma::vec Dvals2 = arma::zeros(Dsize);
-  
 
-  #pragma omp parallel for 
+  //#pragma omp parallel for 
   for(int i=0; i<n_blocks; i++){
     int u = block_names(i)-1;
-    arma::mat Kcc = xCovHUV(coords, indexing(u), indexing(u), theta, Dmat, true);
+    arma::mat Kcc = mvCovAG20107(coords, qvblock_c, indexing(u), indexing(u), ai1, ai2, phi_i, thetamv, Dmat, true);
     if(parents(u).n_elem > 0){
-      arma::mat Kxxi = arma::inv_sympd(xCovHUV(coords, parents_indexing(u), parents_indexing(u), theta, Dmat, true));
-      arma::mat Kcx = xCovHUV(coords, indexing(u), parents_indexing(u), theta, Dmat, false);
+      arma::mat Kxx = mvCovAG20107(coords, qvblock_c, parents_indexing(u), parents_indexing(u), ai1, ai2, phi_i, thetamv, Dmat, true);
+      arma::mat Kxxi = arma::inv_sympd(Kxx);
+
+      arma::mat Kcx = mvCovAG20107(coords, qvblock_c, indexing(u), parents_indexing(u), ai1, ai2, phi_i, thetamv, Dmat, false);
       arma::mat Hj = Kcx * Kxxi;
       arma::mat Rj = Kcc - Kcx * Kxxi * Kcx.t();
       
@@ -226,8 +251,6 @@ Eigen::VectorXd spamtree_sample(
     }
   }
   
-  
-    
   // EIGEN
   Eigen::SparseMatrix<double> I_eig(n, n);
   I_eig.setIdentity();
@@ -258,6 +281,3 @@ Eigen::VectorXd spamtree_sample(
 }
 
 
-
-
-*/
