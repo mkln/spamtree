@@ -87,6 +87,7 @@ public:
   //arma::field<arma::vec> dim_by_child;
   
   // params
+  arma::vec bigrnorm;
   arma::mat w;
   arma::vec Bcoeff; // sampled
   double    tausq_inv;

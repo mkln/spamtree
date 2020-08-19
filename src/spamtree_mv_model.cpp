@@ -992,7 +992,7 @@ void SpamTreeMV::gibbs_sample_w_std(bool need_update){
     Rcpp::Rcout << "[gibbs_sample_w] sampling " << endl;
   }
   
-  
+  bigrnorm = arma::randn(coords.n_rows);
   
   arma::vec timings = arma::zeros(8);
   
@@ -1049,7 +1049,7 @@ void SpamTreeMV::gibbs_sample_w_std(bool need_update){
         //start = std::chrono::steady_clock::now();
         arma::mat Sigi_chol = param_data.Sigi_chol(u);
         //Rcpp::Rcout << "step 4 " << endl;
-        arma::vec rnvec = arma::randn(indexing(u).n_elem);//arma::vectorise(rand_norm_mat.rows(indexing(u)));
+        arma::vec rnvec = bigrnorm.rows(indexing(u));//arma::randn(indexing(u).n_elem);//arma::vectorise(rand_norm_mat.rows(indexing(u)));
         
         w.rows(indexing(u)) = Sigi_chol.t() * (Sigi_chol * Smu_tot + rnvec);
         
@@ -1059,8 +1059,7 @@ void SpamTreeMV::gibbs_sample_w_std(bool need_update){
       } else {
         // this is a non-reference THIN set. *all* locations conditionally independent here given parents.
         //start = std::chrono::steady_clock::now();
-        
-        arma::vec rnvec = arma::randn(indexing(u).n_elem);
+        arma::vec rnvec = bigrnorm.rows(indexing(u));//arma::randn(indexing(u).n_elem);
         
         arma::uvec ones = arma::ones<arma::uvec>(1);
         arma::vec tsq_Zt_y_XB = //Ztausq * 
@@ -1336,7 +1335,7 @@ void SpamTreeMV::gibbs_sample_w_std(bool need_update){
 
 void SpamTreeMV::predict(bool theta_update=true){
   // S=standard gibbs (cheapest), P=residual process, R=residual process using recursive functions
-  predict_std(false, theta_update);
+  predict_std(true, theta_update);
 }
 
 void SpamTreeMV::predict_std(bool sampling=true, bool theta_update=true){
@@ -1422,9 +1421,9 @@ void SpamTreeMV::predict_std(bool sampling=true, bool theta_update=true){
           Ktemp(0,0) = 0;
           Rchol = arma::zeros(1,1);
         }
-        arma::vec rnvec = arma::randn(1);
+        //arma::vec rnvec = arma::randn(1);
         
-        w.row(indexing(u)(ix)) = param_data.w_cond_mean_K(u).rows(first_ix, last_ix) * w_par + Rchol * rnvec;
+        w.row(indexing(u)(ix)) = param_data.w_cond_mean_K(u).rows(first_ix, last_ix) * w_par + Rchol * bigrnorm(indexing(u)(ix));
       }
     } else {
       w.rows(indexing(u)) = param_data.w_cond_mean_K(u) * w_par;

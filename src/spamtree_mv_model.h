@@ -97,6 +97,7 @@ public:
   //arma::field<arma::vec> dim_by_child;
   
   // params
+  arma::vec bigrnorm;
   arma::vec w;
   arma::mat Bcoeff; // sampled
   arma::vec XB;
