@@ -77,22 +77,38 @@ Rcpp::List spamtree_mcmc(
   Rcpp::Rcout << "Lower and upper bounds for priors:\n";
   arma::mat set_unif_bounds = set_unif_bounds_in;
   
+  int sigmasq_mh = 1;
+  arma::vec theta_start = theta;
+  arma::mat mcmcsd_start = mcmcsd;
+  
   if(d == 2){
     if(q > 2){
-      npars = 1 + 3;
+      npars = sigmasq_mh + 3;
     } else {
-      npars = 1 + 1;
+      if(q==1){
+        sigmasq_mh = 1;
+        npars = sigmasq_mh + 1;
+        
+      } else {
+        npars = sigmasq_mh + 1;
+      }
+      
     }
   } else {
     if(q > 2){
-      npars = 1+5;
+      npars = sigmasq_mh+5;
     } else {
-      npars = 1+3; // sigmasq + alpha + beta + phi
+      npars = sigmasq_mh+3; // sigmasq + alpha + beta + phi
     }
   }
   
-  k = q * (q-1)/2;
+  if(sigmasq_mh == 0){
+    theta_start = theta.subvec(0, npars-1);
+    mcmcsd_start = mcmcsd.submat(0, 0, npars-1, npars-1);
+  }
   
+  k = q * (q-1)/2;
+  Rcpp::Rcout << theta << endl;
   Rcpp::Rcout << "Number of pars: " << npars << " plus " << k << " for multivariate\n"; 
   npars += k; // for xCovHUV + Dmat for variables (excludes sigmasq)
   
@@ -105,7 +121,7 @@ Rcpp::List spamtree_mcmc(
                   parents, children, layer_names, layer_gibbs_group,
                   indexing,
                   
-                  start_w, beta, theta, 1.0/tausq, sigmasq,
+                  start_w, beta, theta_start, 1.0/tausq, sigmasq,
                   
                   use_alg, num_threads,
                   verbose, debug);
@@ -150,7 +166,7 @@ Rcpp::List spamtree_mcmc(
   bool interrupted = false;
   
   
-  MHAdapter adaptivemc(param.n_elem, mcmc, mcmcsd);
+  MHAdapter adaptivemc(param.n_elem, mcmc, mcmcsd_start);
   
   Rcpp::Rcout << "Running MCMC for " << mcmc << " iterations." << endl;
   
@@ -216,9 +232,7 @@ Rcpp::List spamtree_mcmc(
         
         bool out_unif_bounds = unif_bounds(new_param, set_unif_bounds);
         //Rcpp::Rcout << "new phi: " << new_param << endl;
-        
         mtree.theta_update(mtree.alter_data, new_param); 
-        
         mtree.get_loglik_comps_w( mtree.alter_data );
         
         bool accepted = !out_unif_bounds;
@@ -308,6 +322,20 @@ Rcpp::List spamtree_mcmc(
           Rcpp::Rcout << endl;
         }
       }
+      
+      start = std::chrono::steady_clock::now();
+      if(sample_sigmasq & (sigmasq_mh==0)){
+        mtree.gibbs_sample_sigmasq();
+      }
+      end = std::chrono::steady_clock::now();
+      if(verbose_mcmc & sample_beta & verbose){
+        Rcpp::Rcout << "[sigmasq] " 
+                    << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "us. "; 
+        if(verbose || debug){
+          Rcpp::Rcout << endl;
+        }
+      }
+      
       
       start = std::chrono::steady_clock::now();
       if(sample_tausq){

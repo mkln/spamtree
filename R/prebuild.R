@@ -172,10 +172,10 @@ Building...")
         if(q > 2){
           dlim <- sqrt(q+.0)
         } else {
-          dlim <- 1e5
+          dlim <- toplim
         }
-        vbounds[,1] <- 1e-5;
-        vbounds[,2] <- dlim - 1e-5
+        vbounds[,1] <- btmlim;
+        vbounds[,2] <- toplim - btmlim
         set_unif_bounds <- rbind(set_unif_bounds, vbounds)
       }
     } else {
@@ -259,7 +259,11 @@ Building...")
   # Domain partitioning and gibbs groups
   #system.time(coords_blocking <- coords %>% tessellation_axis_parallel(Mv, num_threads) %>% cbind(na_which))
   #cell_size <- 25
-  axis_size <- round(cell_size^(1/dd))
+  if(length(cell_size) == 1){
+    axis_size <- round(cell_size^(1/dd))
+  } else {
+    axis_size <- cell_size
+  }
   
   ###### partitioning
   coords <- simdata %>% dplyr::select(contains("Var"), ix) %>% as.matrix()
@@ -383,7 +387,8 @@ Building...")
 #' @export
 prebuild_mv <- function(y, X, coords, 
                      mv_id = rep(1, length(y)),
-                     cell_size=25, K=rep(2, ncol(coords)),
+                     cell_size=25, 
+                     K=rep(2, ncol(coords)),
                      max_res = Inf,
                      last_not_reference = T,
                      limited_tree = F,
@@ -393,7 +398,7 @@ prebuild_mv <- function(y, X, coords,
                      num_threads = 4,
                      use_alg     = 'S', #S: standard, P: using residual process ortho decomp, R: P with recursive functions
                      settings    = list(adapting=T, mcmcsd=.2, verbose=F, debug=F, printall=F),
-                     prior       = list(set_unif_bounds=NULL),
+                     prior       = list(set_unif_bounds=NULL, btmlim=NULL, toplim=NULL),
                      starting    = list(beta=NULL, tausq=NULL, theta=NULL, w=NULL),
                      debug       = list(sample_beta=T, sample_tausq=T, 
                                         sample_theta=T, 
@@ -475,8 +480,17 @@ Building...")
     stime_biv      <- (dd==3) & (q==2) 
     stime_mul      <- (dd==3) & (q >2)  
     
-    toplim <- 1e5
-    btmlim <- 1e-5
+    if(is.null(prior$btmlim)){
+      btmlim <- 1e-5
+    } else {
+      btmlim <- prior$btmlim
+    }
+    
+    if(is.null(prior$toplim)){
+      toplim <- 1e5
+    } else {
+      toplim <- prior$toplim
+    }
     
     if(dd == 2){
       n_cbase <- ifelse(q > 2, 3, 1)
@@ -498,10 +512,10 @@ Building...")
         if(q > 2){
           dlim <- sqrt(q+.0)
         } else {
-          dlim <- 1e5
+          dlim <- toplim
         }
-        vbounds[,1] <- 1e-5;
-        vbounds[,2] <- dlim - 1e-5
+        vbounds[,1] <- btmlim
+        vbounds[,2] <- dlim - btmlim
         set_unif_bounds <- rbind(set_unif_bounds, vbounds)
       }
     }
@@ -572,7 +586,12 @@ Building...")
   # Domain partitioning and gibbs groups
   #system.time(coords_blocking <- coords %>% tessellation_axis_parallel(Mv, num_threads) %>% cbind(na_which))
   #cell_size <- 25
-  axis_size <- round(cell_size^(1/dd))
+  if(length(cell_size) == 1){
+    axis_size <- round(cell_size^(1/dd))
+  } else {
+    axis_size <- cell_size
+  }
+  
   
   ###### partitioning
   coords <- simdata %>% dplyr::select(contains("Var"), ix) %>% as.matrix()

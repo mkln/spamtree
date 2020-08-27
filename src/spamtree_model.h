@@ -26,6 +26,7 @@ public:
   int dd;
   int n_blocks;
   int npars;
+  int sigmasq_mh;
   
   // data
   arma::vec y;
@@ -87,7 +88,7 @@ public:
   //arma::field<arma::vec> dim_by_child;
   
   // params
-  arma::vec bigrnorm;
+  arma::mat bigrnorm;
   arma::mat w;
   arma::vec Bcoeff; // sampled
   double    tausq_inv;
@@ -288,17 +289,24 @@ SpamTree::SpamTree(
   
   indexing    = indexing_in;
   
+  sigmasq_mh = 1;
   if(dd == 2){
     if(q > 2){
-      npars = 1+3;
+      npars = sigmasq_mh+3;
     } else {
-      npars = 1+1;
+      if(q==1){
+        sigmasq_mh = 1;
+        npars = sigmasq_mh+1;
+      } else {
+        npars = sigmasq_mh + 1;
+      }
+      
     }
   } else {
     if(q > 2){
-      npars = 1+5;
+      npars = sigmasq_mh+5;
     } else {
-      npars = 1+3; // sigmasq + alpha + beta + phi
+      npars = sigmasq_mh+3; // sigmasq + alpha + beta + phi
     }
   }
   
@@ -605,7 +613,12 @@ void SpamTree::init_model_data(const arma::vec& theta_in){
   param_data.logdetCi       = 0;
   param_data.loglik_w_comps = arma::zeros(n_blocks);
   param_data.loglik_w       = 0;
-  param_data.theta          = arma::join_vert(arma::ones(1) * sigmasq, theta_in);
+  if(sigmasq_mh == 0){
+    param_data.theta          = theta_in;
+  } else {
+    param_data.theta          = arma::join_vert(arma::ones(1) * sigmasq, theta_in);
+  }
+  
   //param_data.cholfail       = false;
   //param_data.track_chol_fails = arma::zeros<arma::uvec>(n_blocks);
   
@@ -664,7 +677,7 @@ void SpamTree::get_loglik_w_std(SpamTreeData& data){
   }
   
   //arma::uvec blocks_not_empty = arma::find(block_ct_obs > 0);
- //***#pragma omp parallel for //**
+ #pragma omp parallel for //**
   for(int i=0; i<blocks_not_empty.n_elem; i++){  
     int u = blocks_not_empty(i);
   
@@ -723,8 +736,14 @@ void SpamTree::get_loglik_w_std(SpamTreeData& data){
 void SpamTree::theta_transform(const SpamTreeData& data){
   //arma::vec Kparam = data.theta; 
   int k = data.theta.n_elem - npars; // number of cross-distances = p(p-1)/2
+
+  if(sigmasq_mh == 0){
+    cparams = arma::join_vert(arma::ones(1) * sigmasq, 
+                              data.theta.subvec(0, npars - 1));
+  } else {
+    cparams = data.theta.subvec(0, npars - 1);
+  }
   
-  cparams = data.theta.subvec(0, npars - 1);
   
   if(k>0){
     Dmat = vec_to_symmat(data.theta.subvec(npars, npars + k - 1));
@@ -745,9 +764,9 @@ void SpamTree::get_loglik_comps_w_std(SpamTreeData& data){
   // arma::vec timings = arma::zeros(7);
   theta_transform(data);
   // cycle through the resolutions starting from the bottom
-  
+
   for(int g=0; g<n_actual_groups; g++){
-//***#pragma omp parallel for 
+#pragma omp parallel for 
     for(int i=0; i<u_by_block_groups(g).n_elem; i++){
       int u = u_by_block_groups(g)(i);
       //if(block_ct_obs(u) > 0){
@@ -890,7 +909,7 @@ void SpamTree::gibbs_sample_w_std(){
     if(res_is_ref(g) == 1){
       
       
-//////***#pragma omp parallel for 
+////#pragma omp parallel for 
       for(int i=0; i<u_by_block_groups(g).n_elem; i++){
         int u = u_by_block_groups(g)(i);
     
@@ -1010,7 +1029,7 @@ void SpamTree::gibbs_sample_w_std(){
       
       
       //Rcpp::Rcout << "step 1a" << endl;
-//***#pragma omp parallel for
+#pragma omp parallel for
       for(int i=0; i<u_by_block_groups(g).n_elem; i++){
         int u = u_by_block_groups(g)(i);
         // this is a non-reference THIN set. *all* locations conditionally independent here given parents.
@@ -1082,14 +1101,14 @@ void SpamTree::gibbs_sample_w_std(){
   }
   
   Rcpp::RNGScope scope;
-  arma::mat rand_norm_mat = arma::randn(coords.n_rows, q);
+  bigrnorm = arma::randn(coords.n_rows, q);
   //Rcpp::Rcout << rand_norm_mat.head_rows(10) << endl << " ? " << endl;
   
   arma::vec timings = arma::zeros(8);
   
   for(int g=n_actual_groups-1; g>=0; g--){
   
-  //***#pragma omp parallel for
+  #pragma omp parallel for
     for(int i=0; i<u_by_block_groups(g).n_elem; i++){
       int u = u_by_block_groups(g)(i);
       arma::vec w_par;
@@ -1120,7 +1139,7 @@ void SpamTree::gibbs_sample_w_std(){
         
         arma::mat Sigi_chol = arma::inv(arma::trimatl(arma::chol( arma::symmatu( Sigi_tot ), "lower")));
         
-        arma::vec rnvec = arma::vectorise(rand_norm_mat.rows(indexing(u)));
+        arma::vec rnvec = arma::vectorise(bigrnorm.rows(indexing(u)));
         arma::vec w_temp = Sigi_chol.t() * (Sigi_chol * Smu_tot + rnvec);
         
         w.rows(indexing(u)) = arma::trans(arma::mat(w_temp.memptr(), q, w_temp.n_elem/q));
@@ -1132,7 +1151,7 @@ void SpamTree::gibbs_sample_w_std(){
         // this is a non-reference THIN set. *all* locations conditionally independent here given parents.
         //start = std::chrono::steady_clock::now();
         w_par = arma::vectorise(arma::trans(w.rows(parents_indexing(u))));//indexing(p) ) ));
-        arma::vec rnvec = arma::vectorise(rand_norm_mat.rows(indexing(u)));
+        arma::vec rnvec = arma::vectorise(bigrnorm.rows(indexing(u)));
         arma::uvec ones = arma::ones<arma::uvec>(1);
         arma::mat tsq_Zt_y_XB = tausq_inv * Zblock(u).t() * (y.rows(indexing(u)) - X.rows(indexing(u)) * Bcoeff);
         //end = std::chrono::steady_clock::now();
@@ -1247,7 +1266,7 @@ void SpamTree::gibbs_sample_w_rpx(){
   theta_transform(param_data);
   
   Rcpp::RNGScope scope;
-  arma::mat rand_norm_mat = arma::randn(coords.n_rows, q);
+  bigrnorm = arma::randn(coords.n_rows, q);
   
   //arma::vec timings = arma::zeros(5);
   //Rcpp::Rcout << "starting loops \n";
@@ -1260,7 +1279,7 @@ void SpamTree::gibbs_sample_w_rpx(){
     arma::uvec grpuvec = arma::ones<arma::uvec>(1) * grp;
     arma::uvec other_etas = arma::find(block_groups_labels != grp+1);
     
-  //***#pragma omp parallel for 
+  #pragma omp parallel for 
     for(int i=0; i<u_by_block_groups(g).n_elem; i++){
       int u = u_by_block_groups(g)(i);
       // eta_rpx is cube (location x q x grp)
@@ -1314,7 +1333,7 @@ void SpamTree::gibbs_sample_w_rpx(){
         
         // sample independent residual
         //Rcpp::Rcout << "sampling size " << indexing(u).n_elem << endl;
-        arma::vec rnvec = arma::vectorise(rand_norm_mat.rows(indexing(u)));
+        arma::vec rnvec = arma::vectorise(bigrnorm.rows(indexing(u)));
         
         arma::vec w_local = Sigi_chol.t() * (Sigi_chol * Smu_tot + rnvec); 
         arma::mat w_fillmat = arma::trans(arma::mat(w_local.memptr(), q, w_local.n_elem/q));
@@ -1350,7 +1369,7 @@ void SpamTree::gibbs_sample_w_rpx(){
           arma::mat Smu_tot = tausq_inv * ZZ.t() *
             (y.row(indexing(u)(ix)) - X.row(indexing(u)(ix)) * Bcoeff - Zw_others(ix));
           arma::mat Sigi_chol = arma::inv(arma::trimatl(arma::chol( arma::symmatu( Sigi_tot ), "lower")));
-          arma::vec rnvec = arma::vectorise(rand_norm_mat.row(indexing(u)(ix)));
+          arma::vec rnvec = arma::vectorise(bigrnorm.row(indexing(u)(ix)));
           arma::vec w_local = Sigi_chol.t() * (Sigi_chol * Smu_tot + rnvec); 
           w_fillmat.row(ix) = arma::trans(arma::mat(w_local.memptr(), q, w_local.n_elem/q));
         }
@@ -1392,15 +1411,12 @@ void SpamTree::bfirls_w(){
   // covariance parameters
   theta_transform(param_data);
   
-  Rcpp::RNGScope scope;
-  arma::mat rand_norm_mat = arma::randn(coords.n_rows, q);
-  
   for(int g=0; g<n_actual_groups; g++){
     int grp = block_groups_labels(g) - 1;
     arma::uvec grpuvec = arma::ones<arma::uvec>(1) * grp;
     arma::uvec other_etas = arma::find(block_groups_labels != grp+1);
     
-    //***#pragma omp parallel for 
+    #pragma omp parallel for 
     for(int i=0; i<u_by_block_groups(g).n_elem; i++){
       int u = u_by_block_groups(g)(i);
       // ######################################
@@ -1532,7 +1548,7 @@ void SpamTree::bfirls_w(){
 
 void SpamTree::predict(bool theta_update=true){
   // S=standard gibbs (cheapest), P=residual process, R=residual process using recursive functions
-  predict_std(false, theta_update);
+  predict_std(true, theta_update);
 }
 
 void SpamTree::predict_std(bool sampling=true, bool theta_update=true){
@@ -1546,7 +1562,7 @@ void SpamTree::predict_std(bool sampling=true, bool theta_update=true){
   
   // cycle through the resolutions starting from the bottom
   //arma::uvec predicting_blocks = arma::find(block_ct_obs == 0);
-//***#pragma omp parallel for
+#pragma omp parallel for
   for(int i=0; i<blocks_predicting.n_elem; i++){
     int u = blocks_predicting(i);
     // meaning this block must be predicted
@@ -1599,7 +1615,7 @@ void SpamTree::predict_std(bool sampling=true, bool theta_update=true){
         arma::mat Kcc = xCovHUV(coords, uix, uix, cparams, Dmat, true);
         //arma::uvec ix_q = arma::regspace<arma::uvec>(ix*q, ix*q+q-1);
         arma::mat Rchol = arma::chol(arma::symmatu(Kcc - cond_mean_K.rows(first_ix, last_ix) * param_data.Kxc(u).cols(first_ix, last_ix)), "lower");
-        arma::vec rnvec = arma::randn(q);
+        arma::vec rnvec = arma::vectorise(bigrnorm.rows(uix));
         
         arma::vec w_temp = cond_mean_K.rows(first_ix, last_ix) * w_par + Rchol * rnvec;
         w.row(indexing(u)(ix)) = arma::trans(arma::mat(w_temp.memptr(), q, w_temp.n_elem/q));
@@ -1731,8 +1747,9 @@ void SpamTree::gibbs_sample_sigmasq(){
     Rcpp::Rcout << "Error with sigmasq" << endl;
     throw 1;
   }
+  
   // change all K
-//***#pragma omp parallel for
+#pragma omp parallel for
   for(int i=0; i<blocks_not_empty.n_elem; i++){
     int u = blocks_not_empty(i);
     //if(block_ct_obs(u) > 0){
@@ -1748,12 +1765,7 @@ void SpamTree::gibbs_sample_sigmasq(){
     }
     param_data.wcore(u) = old_new_ratio * param_data.wcore(u);//arma::conv_to<double>::from(w_x.t() * data.w_cond_prec(u) * w_x);
     param_data.loglik_w_comps(u) = //block_ct_obs(u)//
-      (q*indexing(u).n_elem + .0) 
-      * hl2pi -.5 * param_data.wcore(u);
-    //} else {
-    //  param_data.wcore(u) = 0;
-    //  param_data.loglik_w_comps(u) = 0;
-    //}
+      (q*indexing(u).n_elem + .0) * hl2pi -.5 * param_data.wcore(u);
   }
   
   param_data.logdetCi = arma::accu(param_data.logdetCi_comps);
