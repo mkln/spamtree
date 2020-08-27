@@ -12,7 +12,9 @@ prebuild <- function(y, X, Z, coords,
                               num_threads = 4,
                               use_alg     = 'S', #S: standard, P: using residual process ortho decomp, R: P with recursive functions
                               settings    = list(adapting=T, mcmcsd=.3, verbose=F, debug=F, printall=F),
-                              prior       = list(set_unif_bounds=NULL),
+                              prior       = list(set_unif_bounds=NULL, 
+                                                 toplim = 1e5,
+                                                 btmlim = 1e-5),
                               starting    = list(beta=NULL, tausq=NULL, sigmasq=NULL, theta=NULL, w=NULL),
                               debug       = list(sample_beta=T, sample_tausq=T, 
                                                  sample_sigmasq=T, sample_theta=T, 
@@ -126,9 +128,6 @@ Building...")
     } else {
       start_theta  <- starting$theta
     }
-    
-    toplim <- 1e5
-    btmlim <- 1e-5
     
     if(is.null(prior$set_unif_bounds)){
       if(dd == 3){
