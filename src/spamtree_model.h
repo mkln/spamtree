@@ -677,7 +677,7 @@ void SpamTree::get_loglik_w_std(SpamTreeData& data){
   }
   
   //arma::uvec blocks_not_empty = arma::find(block_ct_obs > 0);
- #pragma omp parallel for //**
+ //*** omp parallel for //**
   for(int i=0; i<blocks_not_empty.n_elem; i++){  
     int u = blocks_not_empty(i);
   
