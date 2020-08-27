@@ -129,6 +129,20 @@ Building...")
       start_theta  <- starting$theta
     }
     
+    
+    if(is.null(prior$btmlim)){
+      btmlim <- 1e-5
+    } else {
+      btmlim <- prior$btmlim
+    }
+    
+    if(is.null(prior$toplim)){
+      toplim <- 1e5
+    } else {
+      toplim <- prior$toplim
+    }
+    
+    
     if(is.null(prior$set_unif_bounds)){
       if(dd == 3){
         # spacetime
