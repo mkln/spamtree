@@ -417,6 +417,7 @@ void SpamTreeMV::init_finalize(){
 
 void SpamTreeMV::init_model_data(const arma::vec& theta_in){
   
+  message("[init_model_data]");
   // data for metropolis steps and predictions
   // block params
   

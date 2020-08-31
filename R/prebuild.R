@@ -249,7 +249,7 @@ Building...")
     colnames(Z)     <- paste0('Z_', 1:ncol(Z))
   }
   
-  coords %<>% apply(2, function(x) (x-min(x))/(max(x)-min(x)))
+  #coords %<>% apply(2, function(x) (x-min(x))/(max(x)-min(x)))
   colnames(coords)  <- paste0('Var', 1:dd)
   
   na_which <- ifelse(!is.na(y), 1, NA)
