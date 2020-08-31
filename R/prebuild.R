@@ -407,6 +407,7 @@ prebuild_mv <- function(y, X, coords,
                      limited_tree = F,
                      cherrypick_same_margin = T,
                      cherrypick_group_locations = T,
+                     mvbias=0,
                      mcmc        = list(keep=1000, burn=0, thin=1),
                      num_threads = 4,
                      use_alg     = 'S', #S: standard, P: using residual process ortho decomp, R: P with recursive functions
@@ -426,9 +427,12 @@ prebuild_mv <- function(y, X, coords,
     coords <- coords_q
     #mv_id <- matrix(1, nrow=n) %x% 1:q
     #Z <- X
-    cell_size=16; K=rep(4, ncol(coords)); max_res <- 4
-    last_not_reference <- T
-    limited_tree <- T
+    cell_size=c(5,5); K=rep(2, ncol(coords)); max_res <- 7
+    last_not_reference <- F
+    limited_tree <- F
+    cherrypick_same_margin <- T
+    cherrypick_group_locations <- F
+    mvbias <- 0
     mcmc        = list(keep=1000, burn=0, thin=1);
     num_threads = 4;
     use_alg     = 'S'; #S: standard, P: using residual process ortho decomp, R: P with recursive functions
@@ -610,7 +614,8 @@ Building...")
   coords <- simdata %>% dplyr::select(contains("Var"), ix) %>% as.matrix()
   na_which <- simdata$na_which
   axis_cell_size <- rep(axis_size, dd)
-  #save(file="debug.RData", list=c("coords", "sort_mv_id", "na_which", "axis_cell_size"))
+  #save(file="debug.RData", list=c("coords", "sort_mv_id", "na_which", "axis_cell_size", "K", "max_res", "last_not_reference",
+  #                                "cherrypick_same_margin", "cherrypick_group_locations"))
   #load("debug.RData")
   
   cat("Building reference set.\n")
@@ -618,7 +623,8 @@ Building...")
     mgp_tree <- spamtree:::make_tree(coords, na_which, sort_mv_id, 
                                      axis_cell_size, K, max_res, last_not_reference,
                                      cherrypick_same_margin,
-                                     cherrypick_group_locations)
+                                     cherrypick_group_locations,
+                                     mvbias)
   )
   #cat("Partitioning total time: ", as.numeric(ptime["elapsed"]), "\n")
   

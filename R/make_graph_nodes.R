@@ -2,11 +2,15 @@ make_tree <- function(coords, na_which, sort_mv_id,
                       axis_cell_size=c(5,5), K=c(2,2), 
                       max_res=Inf, last_not_reference=T,
                       cherrypick_same_margin = T,
-                      cherrypick_group_locations = T){
-  #Rcpp::sourceCpp("src/multires_utils.cpp")
- 
-  #coords <- rnorm(1000, 0, 2) %>% matrix(ncol=2) %>% apply(2, function(x) (x-min(x))/(max(x)-min(x)))
-  #colnames(coords) <- c("Var1", "Var2")
+                      cherrypick_group_locations = T,
+                      mvbias=0){
+  # mvbias: 0 = treat all multivariate margins the same
+  # >0 = prefer picking sparser margins for lower resolutions
+  
+  mv_id_weights <- table(na_which, sort_mv_id) %>% `[`(1,) %>% 
+    magrittr::raise_to_power(-mvbias) %>% magrittr::divide_by(sum(.))
+  mv_id_weights <- data.frame(mv_id_weight=mv_id_weights) %>% 
+    tibble::rownames_to_column("sort_mv_id") %>% mutate(sort_mv_id=as.numeric(sort_mv_id))
   
   coords_allres <- coords %>% as.data.frame() %>% cbind(sort_mv_id)
   coords_missing <- coords_allres[is.na(na_which),] 
@@ -59,9 +63,9 @@ make_tree <- function(coords, na_which, sort_mv_id,
             # if grid is too thin considering available coordinates, skip this and partition directly
             coords_knots <- cx[,-4] %>% as.matrix() %>%
               spamtree:::axis_parallel(thresholds_knots, 4) %>%
+              cbind(data.frame(sort_mv_id = cx[,4])) %>% left_join(mv_id_weights, by=c("sort_mv_id"="sort_mv_id")) %>%
               #mutate(block = max_block_number + block) %>%
-              group_by(block) %>% summarise(ix = ix[sample(1:n(), 1)], .groups="keep")
-                                                 # ix[round(n()/2 +.5)])
+              group_by(block) %>% summarise(ix = ix[sample(1:n(), 1, prob=mv_id_weight)], .groups="keep")
             
             if(cherrypick_group_locations){
               coords_knots <- coords_knots %>% as.data.frame() %>% 
