@@ -412,7 +412,7 @@ prebuild_mv <- function(y, X, coords,
                      num_threads = 4,
                      use_alg     = 'S', #S: standard, P: using residual process ortho decomp, R: P with recursive functions
                      settings    = list(adapting=T, mcmcsd=.2, verbose=F, debug=F, printall=F),
-                     prior       = list(set_unif_bounds=NULL, btmlim=NULL, toplim=NULL),
+                     prior       = list(set_unif_bounds=NULL, btmlim=NULL, toplim=NULL, vlim=NULL),
                      starting    = list(beta=NULL, tausq=NULL, theta=NULL, w=NULL),
                      debug       = list(sample_beta=T, sample_tausq=T, 
                                         sample_theta=T, 
@@ -509,6 +509,12 @@ Building...")
       toplim <- prior$toplim
     }
     
+    if(is.null(prior$vlim)){
+      vlim <- toplim
+    } else {
+      vlim <- prior$vlim
+    }
+    
     if(dd == 2){
       n_cbase <- ifelse(q > 2, 3, 1)
       npars <- 3*q + n_cbase
@@ -527,9 +533,9 @@ Building...")
       if(q > 1){
         vbounds <- matrix(0, nrow=k, ncol=2)
         if(q > 2){
-          dlim <- sqrt(q+.0)
+          dlim <- vlim#sqrt(q+.0)
         } else {
-          dlim <- toplim
+          dlim <- vlim#toplim
         }
         vbounds[,1] <- btmlim
         vbounds[,2] <- dlim - btmlim
