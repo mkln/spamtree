@@ -6,7 +6,7 @@ const double tau_accept = 0.234; // target
 const double g_exp = .01;
 const int g0 = 500; // iterations before starting adaptation
 const double rho_max = 2;
-const double rho_min = 5;
+const double rho_min = 7;
 
 
 inline bool do_I_accept(double logaccept){ //, string name_accept, string name_count, List mcmc_pars){
