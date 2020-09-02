@@ -1,3 +1,4 @@
+#define ARMA_DONT_PRINT_ERRORS
 #include "spamtree_mv_model.h"
 
 
@@ -847,6 +848,8 @@ void SpamTreeMV::get_loglik_comps_w_std(SpamTreeMVData& data){
   theta_transform(data);
   // cycle through the resolutions starting from the bottom
   
+  int errtype = -1;
+  
   for(int g=0; g<n_actual_groups; g++){
 #pragma omp parallel for 
     for(int i=0; i<u_by_block_groups(g).n_elem; i++){
@@ -864,18 +867,19 @@ void SpamTreeMV::get_loglik_comps_w_std(SpamTreeMVData& data){
         
         try{
           data.Kxx_invchol(u) = arma::inv(arma::trimatl(arma::chol(Kcc, "lower")));
+          data.Kxx_inv(u) = data.Kxx_invchol(u).t() * data.Kxx_invchol(u);
+          data.Rcc_invchol(u) = data.Kxx_invchol(u); 
+          data.w_cond_prec(u) = data.Kxx_inv(u);//Rcc_invchol(u).t() * Rcc_invchol(u);
+          data.wcore(u) = arma::conv_to<double>::from(w_x.t() * data.w_cond_prec(u) * w_x);
+          data.ccholprecdiag(u) = data.Rcc_invchol(u).diag();
+          //end = std::chrono::steady_clock::now();
+          //timings(0) += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+          
         } catch(...){
-          Rcpp::Rcout << "1" << endl;
-          throw 1;
+          errtype = 1;
         }
         
-        data.Kxx_inv(u) = data.Kxx_invchol(u).t() * data.Kxx_invchol(u);
-        data.Rcc_invchol(u) = data.Kxx_invchol(u); 
-        data.w_cond_prec(u) = data.Kxx_inv(u);//Rcc_invchol(u).t() * Rcc_invchol(u);
-        data.wcore(u) = arma::conv_to<double>::from(w_x.t() * data.w_cond_prec(u) * w_x);
-        data.ccholprecdiag(u) = data.Rcc_invchol(u).diag();
-        //end = std::chrono::steady_clock::now();
-        //timings(0) += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+        
       } else {
         //Rcpp::Rcout << "step 2\n";
         int last_par = parents(u)(parents(u).n_elem - 1);
@@ -891,33 +895,34 @@ void SpamTreeMV::get_loglik_comps_w_std(SpamTreeMVData& data){
           arma::mat Kcc = mvCovAG20107(coords, qvblock_c, indexing(u), indexing(u), ai1, ai2, phi_i, thetamv, Dmat, true);
           
           try {
-            
-          data.Rcc_invchol(u) = arma::inv(arma::trimatl(arma::chol(arma::symmatu(
-            Kcc - data.w_cond_mean_K(u) * data.Kxc(u)), "lower")));
-          } catch(...){
-            Rcpp::Rcout << "2" << endl;
-            throw 1;
-          }
-        
-          //end = std::chrono::steady_clock::now();
-          //timings(3) += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-          if(children(u).n_elem > 0){
-            if(limited_tree){
-              data.Kxx_inv(u) = arma::inv_sympd(Kcc);
-            } else {
-              invchol_block_inplace_direct(data.Kxx_invchol(u), data.Kxx_invchol(last_par), 
-                                           data.w_cond_mean_K(u), data.Rcc_invchol(u));
-              data.Kxx_inv(u) = data.Kxx_invchol(u).t() * data.Kxx_invchol(u);
+              
+            data.Rcc_invchol(u) = arma::inv(arma::trimatl(arma::chol(arma::symmatu(
+              Kcc - data.w_cond_mean_K(u) * data.Kxc(u)), "lower")));
+            //end = std::chrono::steady_clock::now();
+            //timings(3) += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+            if(children(u).n_elem > 0){
+              if(limited_tree){
+                data.Kxx_inv(u) = arma::inv_sympd(Kcc);
+              } else {
+                invchol_block_inplace_direct(data.Kxx_invchol(u), data.Kxx_invchol(last_par), 
+                                             data.w_cond_mean_K(u), data.Rcc_invchol(u));
+                data.Kxx_inv(u) = data.Kxx_invchol(u).t() * data.Kxx_invchol(u);
+              }
+              
+              data.has_updated(u) = 1;
             }
             
-            data.has_updated(u) = 1;
+            data.w_cond_prec(u) = data.Rcc_invchol(u).t() * data.Rcc_invchol(u);
+            data.wcore(u) = arma::conv_to<double>::from(w_x.t() * data.w_cond_prec(u) * w_x);
+            data.ccholprecdiag(u) = data.Rcc_invchol(u).diag();
+            //end = std::chrono::steady_clock::now();
+            //timings(3) += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+              
+          } catch(...){
+            errtype = 2;
           }
+        
           
-          data.w_cond_prec(u) = data.Rcc_invchol(u).t() * data.Rcc_invchol(u);
-          data.wcore(u) = arma::conv_to<double>::from(w_x.t() * data.w_cond_prec(u) * w_x);
-          data.ccholprecdiag(u) = data.Rcc_invchol(u).diag();
-          //end = std::chrono::steady_clock::now();
-          //timings(3) += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
         } else {
           // this is a non-reference THIN set. *all* locations conditionally independent here given parents.
           //start = std::chrono::steady_clock::now();
@@ -938,25 +943,24 @@ void SpamTreeMV::get_loglik_comps_w_std(SpamTreeMVData& data){
             //Rcpp::Rcout << "step 3o " << arma::size(cond_mean_K_sub) << " " << arma::size(data.Kxc(u).cols(first_ix, last_ix)) <<  "\n";
             arma::mat Rinvchol;
             try {
-            Rinvchol = arma::inv(arma::trimatl(arma::chol(arma::symmatu(Kcc - Kcx_xxi_xc), "lower")));
-            //data.Rcc_invchol(u).submat(first_ix, first_ix, last_ix, last_ix) = Rinvchol;
+              Rinvchol = arma::inv(arma::trimatl(arma::chol(arma::symmatu(Kcc - Kcx_xxi_xc), "lower")));
+              
+              data.ccholprecdiag(u).subvec(first_ix, last_ix) = Rinvchol.diag();
+              
+              //data.w_cond_prec(u).submat(first_ix, first_ix, last_ix, last_ix) = Rinvchol.t() * Rinvchol;
+              data.w_cond_prec_noref(u)(ix) = Rinvchol.t() * Rinvchol;
+              
+              data.wcore(u) += arma::conv_to<double>::from(
+                w_x.rows(first_ix, last_ix).t() * 
+                  data.w_cond_prec_noref(u)(ix) *
+                  w_x.rows(first_ix, last_ix));
+              
+              //end = std::chrono::steady_clock::now();
+              //timings(6) += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
             } catch(...){
-              Rcpp::Rcout << "3" << endl;
-              throw 1;
+              errtype = 3;
             }
             
-            data.ccholprecdiag(u).subvec(first_ix, last_ix) = Rinvchol.diag();
-            
-            //data.w_cond_prec(u).submat(first_ix, first_ix, last_ix, last_ix) = Rinvchol.t() * Rinvchol;
-            data.w_cond_prec_noref(u)(ix) = Rinvchol.t() * Rinvchol;
-            
-            data.wcore(u) += arma::conv_to<double>::from(
-              w_x.rows(first_ix, last_ix).t() * 
-                data.w_cond_prec_noref(u)(ix) *
-                w_x.rows(first_ix, last_ix));
-            
-            //end = std::chrono::steady_clock::now();
-            //timings(6) += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
           }
           
         }
@@ -968,6 +972,16 @@ void SpamTreeMV::get_loglik_comps_w_std(SpamTreeMVData& data){
     }
   }
   
+  if(errtype > 0){
+    Rcpp::Rcout << "Cholesky failed at some point. Here's the value of theta that caused this" << endl;
+    Rcpp::Rcout << "ai1: " << ai1.t() << endl
+                << "ai2: " << ai2.t() << endl
+                << "phi_i: " << phi_i.t() << endl
+                << "thetamv: " << thetamv.t() << endl
+                << "and Dmat: " << Dmat << endl;
+    throw 1;
+  }
+  
   //Rcpp::Rcout << "timings: " << timings.t() << endl;
   //Rcpp::Rcout << "total timings: " << arma::accu(timings) << endl;
   data.logdetCi = arma::accu(data.logdetCi_comps.subvec(0, n_blocks-1));
@@ -975,7 +989,7 @@ void SpamTreeMV::get_loglik_comps_w_std(SpamTreeMVData& data){
   
   if(verbose){
     end_overall = std::chrono::steady_clock::now();
-    Rcpp::Rcout << "[get_loglik_comps_w_std] "
+    Rcpp::Rcout << "[get_loglik_comps_w_std] " << errtype << " "
                 << std::chrono::duration_cast<std::chrono::microseconds>(end_overall - start_overall).count()
                 << "us.\n";
   }
@@ -1016,6 +1030,8 @@ void SpamTreeMV::gibbs_sample_w_std(bool need_update){
   
   arma::vec timings = arma::zeros(8);
   
+  int errtype = -1;
+  
   for(int g=n_actual_groups-1; g>=0; g--){
     
     #pragma omp parallel for
@@ -1043,10 +1059,9 @@ void SpamTreeMV::gibbs_sample_w_std(bool need_update){
         Sigi_tot.diag() += tausq_inv_long.rows(indexing(u)); //Ztausq * Zblock(u);
         
         try {
-        param_data.Sigi_chol(u) = arma::inv(arma::trimatl(arma::chol( arma::symmatu( Sigi_tot ), "lower")));
+          param_data.Sigi_chol(u) = arma::inv(arma::trimatl(arma::chol( arma::symmatu( Sigi_tot ), "lower")));
         } catch(...){
-          Rcpp::Rcout << "4" << endl;
-          throw 1;
+          errtype = 10;
         }
         //end = std::chrono::steady_clock::now();
         //timings(0) += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
@@ -1125,8 +1140,7 @@ void SpamTreeMV::gibbs_sample_w_std(bool need_update){
           try {
           param_data.Sigi_chol_noref(u)(ix) = arma::inv(arma::trimatl(arma::chol(arma::symmatu(Sigi_tot), "lower")));
           } catch(...){
-            Rcpp::Rcout << "5" << endl;
-            throw 1;
+            errtype = 11;
           }
           arma::mat Sigi_chol = param_data.Sigi_chol_noref(u)(ix);
           
@@ -1204,6 +1218,11 @@ void SpamTreeMV::gibbs_sample_w_std(bool need_update){
       }
       
     }
+  }
+  
+  if(errtype > 0){
+    Rcpp::Rcout << errtype << endl;
+    throw 1;
   }
   
   if(verbose){
