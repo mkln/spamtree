@@ -525,6 +525,10 @@ Building...")
       set_unif_bounds[,1] <- btmlim
       set_unif_bounds[,2] <- toplim
       
+      if(q>1){
+        set_unif_bounds[1:q, 1] <- -toplim
+      }
+      
       if(n_cbase == 3){
         start_theta[npars-1] <- .5
         set_unif_bounds[npars-1,] <- c(btmlim, 1-btmlim)
