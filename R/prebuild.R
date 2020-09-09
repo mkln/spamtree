@@ -526,7 +526,7 @@ Building...")
       set_unif_bounds[,2] <- toplim
       
       if(q>1){
-        set_unif_bounds[1:q, 1] <- -toplim
+        set_unif_bounds[2:q, 1] <- -toplim
       }
       
       if(n_cbase == 3){
