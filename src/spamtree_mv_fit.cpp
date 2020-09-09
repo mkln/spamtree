@@ -245,7 +245,7 @@ Rcpp::List spamtree_mv_mcmc(
         //arma::vec tausqi_original = param.subvec(npars, param.n_elem-1);
         
         mtree.theta_update(mtree.alter_data, theta_proposal);
-        mtree.get_loglik_comps_w( mtree.alter_data );
+        bool acceptable = mtree.get_loglik_comps_w( mtree.alter_data );
         //double tsqi_ll_ratio = mtree.mh_tausq_loglik(tausqi_proposal, tausqi_original);
         
         bool accepted = !out_unif_bounds;
@@ -277,7 +277,7 @@ Rcpp::List spamtree_mv_mcmc(
           throw 1;
         }
         
-        accepted = do_I_accept(logaccept);
+        accepted = do_I_accept(logaccept) & acceptable;
         
         if(accepted){
           std::chrono::steady_clock::time_point start_copy = std::chrono::steady_clock::now();
@@ -379,29 +379,32 @@ Rcpp::List spamtree_mv_mcmc(
         }
         printf("\n");
         
-        tick_mcmc = std::chrono::steady_clock::now();
-      } else {
-        if((m>0) & (mcmc > 100)){
-          if(!(m % (mcmc / 10))){
-            //Rcpp::Rcout << paramsd << endl;
-            //accept_count_local = 0;
-            //propos_count_local = 0;
+        
+      } 
+    
+      if((m>0) & (mcmc > 100)){
+        if(!(m % (mcmc / 10))){
+          //Rcpp::Rcout << paramsd << endl;
+          //accept_count_local = 0;
+          //propos_count_local = 0;
+          
+          interrupted = checkInterrupt();
+          if(interrupted){
+            throw 1;
+          }
+          end_mcmc = std::chrono::steady_clock::now();
+          if(true){
+            int time_tick = std::chrono::duration_cast<std::chrono::milliseconds>(end_mcmc - tick_mcmc).count();
+            int time_mcmc = std::chrono::duration_cast<std::chrono::milliseconds>(end_mcmc - start_mcmc).count();
+            adaptivemc.print_summary(time_tick, time_mcmc, m, mcmc);
             
-            interrupted = checkInterrupt();
-            if(interrupted){
-              throw 1;
-            }
-            end_mcmc = std::chrono::steady_clock::now();
-            if(true){
-              int time_tick = std::chrono::duration_cast<std::chrono::milliseconds>(end_mcmc - tick_mcmc).count();
-              int time_mcmc = std::chrono::duration_cast<std::chrono::milliseconds>(end_mcmc - start_mcmc).count();
-              adaptivemc.print_summary(time_tick, time_mcmc, m, mcmc);
-              
-              tick_mcmc = std::chrono::steady_clock::now();
-            }
-          } 
-        }
+            tick_mcmc = std::chrono::steady_clock::now();
+          }
+        } 
+      } else {
+        tick_mcmc = std::chrono::steady_clock::now();
       }
+      
       
       //save
       if(mx >= 0){

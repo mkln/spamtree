@@ -835,12 +835,12 @@ void SpamTreeMV::theta_transform(const SpamTreeMVData& data){
   }
 }
 
-void SpamTreeMV::get_loglik_comps_w(SpamTreeMVData& data){
+bool SpamTreeMV::get_loglik_comps_w(SpamTreeMVData& data){
   // S=standard gibbs (cheapest), P=residual process, R=residual process using recursive functions
-  get_loglik_comps_w_std(data);
+  return get_loglik_comps_w_std(data);
 }
 
-void SpamTreeMV::get_loglik_comps_w_std(SpamTreeMVData& data){
+bool SpamTreeMV::get_loglik_comps_w_std(SpamTreeMVData& data){
   start_overall = std::chrono::steady_clock::now();
   message("[get_loglik_comps_w_std] start. ");
   
@@ -979,7 +979,8 @@ void SpamTreeMV::get_loglik_comps_w_std(SpamTreeMVData& data){
                 << "phi_i: " << phi_i.t() << endl
                 << "thetamv: " << thetamv.t() << endl
                 << "and Dmat: " << Dmat << endl;
-    throw 1;
+    Rcpp::Rcout << " -- auto rejected and proceeding." << endl;
+    return false;
   }
   
   //Rcpp::Rcout << "timings: " << timings.t() << endl;
@@ -993,6 +994,8 @@ void SpamTreeMV::get_loglik_comps_w_std(SpamTreeMVData& data){
                 << std::chrono::duration_cast<std::chrono::microseconds>(end_overall - start_overall).count()
                 << "us.\n";
   }
+  
+  return true;
 }
 
 void SpamTreeMV::deal_with_w(bool need_update){
@@ -1553,7 +1556,7 @@ void SpamTreeMV::gibbs_sample_tausq(){
     arma::vec XB_availab = XB.rows(na_ix_all);
     arma::mat yrr = y_available.rows(ix_by_q_a(j)) - XB_availab.rows(ix_by_q_a(j)) - Zw_availab.rows(ix_by_q_a(j));
     double bcore = arma::conv_to<double>::from( yrr.t() * yrr );
-    double aparam = 2.01 + ix_by_q_a(j).n_elem/2.0;
+    double aparam = 2.0001 + ix_by_q_a(j).n_elem/2.0;
     double bparam = 1.0/( 1.0 + .5 * bcore );
     
     Rcpp::RNGScope scope;

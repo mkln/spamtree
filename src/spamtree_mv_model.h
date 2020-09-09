@@ -151,8 +151,8 @@ public:
   void get_loglik_w(SpamTreeMVData& data);
   void get_loglik_w_std(SpamTreeMVData& data);
   
-  void get_loglik_comps_w(SpamTreeMVData& data);
-  void get_loglik_comps_w_std(SpamTreeMVData& data);
+  bool get_loglik_comps_w(SpamTreeMVData& data);
+  bool get_loglik_comps_w_std(SpamTreeMVData& data);
   
   
   void deal_with_w(bool);
