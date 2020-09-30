@@ -101,3 +101,7 @@ spamtree_mv_mcmc <- function(y, X, Z, coords, mv_id, blocking, gix_block, res_is
     .Call(`_spamtree_spamtree_mv_mcmc`, y, X, Z, coords, mv_id, blocking, gix_block, res_is_ref, parents, children, limited_tree, layer_names, layer_gibbs_group, indexing, set_unif_bounds_in, start_w, theta, beta, tausq, mcmcsd, mcmc_keep, mcmc_burn, mcmc_thin, num_threads, use_alg, adapting, verbose, debug, printall, sample_beta, sample_tausq, sample_theta, sample_w, sample_predicts)
 }
 
+spamtree_mv_mcmc_devel <- function(y, X, Z, coords, mv_id, blocking, gix_block, res_is_ref, parents, children, limited_tree, layer_names, layer_gibbs_group, indexing, set_unif_bounds_in, start_w, theta, beta, tausq, mcmcsd, mcmc_keep = 100L, mcmc_burn = 100L, mcmc_thin = 1L, num_threads = 1L, use_alg = 'S', adapting = FALSE, verbose = FALSE, debug = FALSE, printall = FALSE, sample_beta = TRUE, sample_tausq = TRUE, sample_theta = TRUE, sample_w = TRUE, sample_predicts = TRUE) {
+    .Call(`_spamtree_spamtree_mv_mcmc_devel`, y, X, Z, coords, mv_id, blocking, gix_block, res_is_ref, parents, children, limited_tree, layer_names, layer_gibbs_group, indexing, set_unif_bounds_in, start_w, theta, beta, tausq, mcmcsd, mcmc_keep, mcmc_burn, mcmc_thin, num_threads, use_alg, adapting, verbose, debug, printall, sample_beta, sample_tausq, sample_theta, sample_w, sample_predicts)
+}
+

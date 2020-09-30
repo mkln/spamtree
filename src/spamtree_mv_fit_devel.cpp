@@ -1,11 +1,11 @@
-#include "spamtree_mv_model.h"
+#include "spamtree_mv_model_devel.h"
 #include "multires_utils.h"
 #include "interrupt_handler.h"
 
 #include <iostream>
 
 //[[Rcpp::export]]
-Rcpp::List spamtree_mv_mcmc(
+Rcpp::List spamtree_mv_mcmc_devel(
     const arma::mat& y, 
     const arma::mat& X, 
     const arma::mat& Z,
@@ -120,11 +120,11 @@ Rcpp::List spamtree_mv_mcmc(
   
   Rcpp::Rcout << set_unif_bounds << endl;
   
-  SpamTreeMV mtree = SpamTreeMV();
+  SpamTreeMVdevel mtree = SpamTreeMVdevel();
   
-  arma::vec start_w_vec = arma::randn(y.n_elem);
+  arma::vec start_w_vec = arma::zeros(y.n_elem);
   
-  mtree = SpamTreeMV("gaussian", y, X, Z, coords, mv_id, 
+  mtree = SpamTreeMVdevel("gaussian", y, X, Z, coords, mv_id, 
                      blocking, gix_block, res_is_ref,
                      
                      parents, children, limited_tree, 
@@ -139,8 +139,8 @@ Rcpp::List spamtree_mv_mcmc(
   
   mtree.get_loglik_comps_w( mtree.param_data );
   mtree.get_loglik_comps_w( mtree.alter_data );
-  mtree.deal_with_w(true);
-  mtree.get_loglik_w(mtree.param_data);
+  //mtree.deal_with_w(true);
+  //mtree.get_loglik_w(mtree.param_data);
    
   arma::vec param = mtree.param_data.theta;//arma::join_vert( , mtree.tausq_inv );
   arma::vec predict_param = param;
@@ -182,14 +182,15 @@ Rcpp::List spamtree_mv_mcmc(
   
   
   Rcpp::Rcout << "Running MCMC for " << mcmc << " iterations." << endl;
-  
+  Rcpp::Rcout << "Starting from "<< mtree.param_data.loglik_w << endl;
+  Rcpp::Rcout << "check with "<< mtree.alter_data.loglik_w << endl;
   double ll_upd_msg;
   
   bool need_update = true;
     
   start_all = std::chrono::steady_clock::now();
   int m=0; int mx=0; int num_chol_fails=0;
-  try { 
+  //try { 
     for(m=0; m<mcmc; m++){
       
       mtree.predicting = false;
@@ -206,11 +207,14 @@ Rcpp::List spamtree_mv_mcmc(
       ll_upd_msg = current_loglik;
       
       start = std::chrono::steady_clock::now();
+      //Rcpp::Rcout << "before updating w "<< mtree.param_data.loglik_w << endl;
       if(sample_w){
         mtree.deal_with_w(true);
         mtree.get_loglik_w(mtree.param_data);
         current_loglik = tempr*mtree.param_data.loglik_w;
       }
+      
+      //Rcpp::Rcout << "after updating w "<< mtree.param_data.loglik_w << endl;
       
       end = std::chrono::steady_clock::now();
       if(verbose_mcmc & sample_w & verbose){
@@ -225,6 +229,8 @@ Rcpp::List spamtree_mv_mcmc(
       
       ll_upd_msg = current_loglik;
       start = std::chrono::steady_clock::now();
+      
+      //Rcpp::Rcout << "before updating theta "<< mtree.param_data.loglik_w << endl;
       bool accepted = true;
       if(sample_theta){
         //propos_count++;
@@ -269,6 +275,7 @@ Rcpp::List spamtree_mv_mcmc(
           //invgamma_logdens(new_param(0), 2, 2) -
           //invgamma_logdens(mtree.param_data.theta(0), 2, 2) +
           jacobian;
+        
         
         if(isnan(logaccept)){
           Rcpp::Rcout << new_param.t() << endl;
@@ -325,16 +332,19 @@ Rcpp::List spamtree_mv_mcmc(
           Rcpp::Rcout << endl;
         }
       }
+      //Rcpp::Rcout << "after updating theta "<< mtree.param_data.loglik_w << endl;
       
       //need_update = true;
       need_update = arma::accu(abs(param - predict_param) > 1e-05);
       
       if((mtree.predicting == true) & sample_predicts){
         // tell predict() if theta has changed because if not, we can avoid recalculating
-        mtree.predict(need_update);
+        //***mtree.predict(need_update);
         predict_param = param;
       }
       
+      
+      //Rcpp::Rcout << "before updating tausq/beta "<< mtree.param_data.loglik_w << endl;
       if(sample_tausq){
         start = std::chrono::steady_clock::now();
         mtree.gibbs_sample_tausq();
@@ -359,6 +369,10 @@ Rcpp::List spamtree_mv_mcmc(
         }
       }
       
+      if(sample_tausq | sample_beta){
+        mtree.update_ll_after_beta_tausq();
+      }
+      //Rcpp::Rcout << "after updating tausq/beta "<< mtree.param_data.loglik_w << endl;
       //need_update = true;
       
       if(printall){
@@ -445,10 +459,13 @@ Rcpp::List spamtree_mv_mcmc(
       Rcpp::Named("indexing") = mtree.indexing,
       Rcpp::Named("parents_indexing") = mtree.parents_indexing,
       
-      Rcpp::Named("mcmc_time") = mcmc_time/1000.0
+      Rcpp::Named("mcmc_time") = mcmc_time/1000.0,
+      Rcpp::Named("Kxx_inv") = mtree.param_data.Kxx_inv,
+      Rcpp::Named("w_cond_mean_K") = mtree.param_data.w_cond_mean_K,
+      Rcpp::Named("Kcc") = mtree.param_data.Kcc
     );
     
-  } catch (const std::exception &exc) {
+  /*} catch (const std::exception &exc) {
     end_all = std::chrono::steady_clock::now();
     Rcpp::Rcout << exc.what() << endl;
     double mcmc_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_all - start_all).count();
@@ -457,7 +474,7 @@ Rcpp::List spamtree_mv_mcmc(
     return Rcpp::List::create(
       Rcpp::Named("None") = arma::zeros(0)
     );
-  }
+  }*/
   
 }
 

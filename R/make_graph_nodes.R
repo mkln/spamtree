@@ -154,7 +154,7 @@ make_tree <- function(coords, na_which, sort_mv_id,
       max_block_number <- max(relate %>% pull(!!sym(blockname)))
     }
     
-    parchi_original <- relate[,sprintf("block_res%02d", 1:res)] %>% 
+    parchi_original <- relate[,sprintf("block_res%02d", 1:res), drop=F] %>% 
       dplyr::select(contains("block_res")) %>% unique()
     translator <- relate %>% 
       mutate(block_unnorm = relate %>% 
@@ -168,8 +168,11 @@ make_tree <- function(coords, na_which, sort_mv_id,
     colnames(parchi_map) <- colnames(parchi_original)
     parchi_map[parchi_map == 0] <- NA
     
-    parchi_map <- parchi_map %>% as.data.frame() %>% 
+    parchi_map <- parchi_map %>% as.data.frame()
+    if(ncol(parchi_map)>1){
+      parchi_map %<>% 
       arrange(!!!syms(sprintf("block_res%02d", 1:(ncol(parchi_map)-1))))
+    }
     
     max_block_number <- coords_refset %>% pull(block) %>% max()
     
@@ -366,4 +369,214 @@ make_tree <- function(coords, na_which, sort_mv_id,
               thresholds = thresholds_list,
               res_is_ref = res_is_ref))
 }
+
+
+make_tree_devel <- function(coords, sort_mv_id, 
+                      axis_cell_size=c(5,5), K=c(2,2), 
+                      max_res=10, add_nudge=c(0,0)){
+  
+  #coordx <- coords 
+  #coords <- coords[sample(1:nrow(coords), 1000, replace=F),] %>% as.data.frame() %>% arrange(Var1, Var2)
+  
+  dd <- sum(grepl("Var", colnames(coords)))
+  unique_coords <- coords[,1:dd] %>% 
+    as.data.frame() %>% 
+    unique()
+  
+  join_vars <- paste0("Var", 1:dd)
+  names(join_vars) <- join_vars
+
+  coordranges <- coords[,1:dd] %>% apply(2, range)
+  #max_res <- 4
+  coord_by_res <- list()
+  res_meta <- matrix(0, ncol=dd, nrow=3)
+  rownames(res_meta) <- c("cells_every_split", 
+                          "cells_this_res", 
+                          "knots_this_res")
+  coords_knots <- unique_coords #data.frame(Var1=numeric(0), Var2=numeric(0))
+  
+  if(dd==3){ coords_knots %<>% mutate(Var3=numeric(0)) }
+  nudge <- rep(0, dd)
+  n_added_knots <- rep(0, max_res)
+  knots_by_res <- list()
+  last_thresholds <- list()
+  thresholds <- list()
+  
+  cat("Adding knots...\n")
+  for(res in max_res:1){
+    xknots <- list()
+    thresholds[[res]] <- list()
+    for(r in 1:dd){
+      res_meta["cells_every_split", r] <- K[r]
+      res_meta["cells_this_res", r] <- K[r]^(res-1)
+      res_meta["knots_this_res", r] <- K[r]^(res-1) * axis_cell_size[r]
+      delta <- (coordranges[2,r]-coordranges[1,r])/res_meta["knots_this_res", r]
+      
+      xknots_base <- seq(coordranges[1,r], coordranges[2,r], length.out=res_meta["knots_this_res", r]+1)
+      xknots[[r]] <- seq(coordranges[1,r] + delta/2, coordranges[2,r], delta)
+      
+      thresholds[[res]][[r]] <- seq(coordranges[1,r]-1e-6, coordranges[2,r]+1e-6, length.out=K[r]^(res-1)+1) %>%
+        head(-1) %>% tail(-1)
+      #spamtree:::kthresholds(xknots_base, K[r]^(res-1))
+      
+      if(res==max_res){
+        last_thresholds[[r]] <- thresholds[[r]]
+      }
+    }
+    coords_this_res <- expand.grid(xknots) %>% mutate(res=res)
+    
+    knots_by_res[[res]] <- coords_this_res
+    
+    n_added_knots[res] <- nrow(coords_this_res)
+    cat("Level:",res,"Adding", n_added_knots[res], "\n")
+  }
+  
+  coords_latent_knots <- bind_rows(knots_by_res)
+  coords_latent_knots %>% filter(res<4) %>% 
+    ggplot(aes(Var1, Var2, color=factor(res))) + geom_point(size=1) + theme(legend.position="none")
+  
+  
+  expand_to_mv <- function(df, sort_mv_id){
+    ixn <- 1:nrow(df)
+    umv <- unique(sort_mv_id)
+    mv_expand <- expand.grid(ixn, umv) %>% rename(ixn=Var1, sort_mv_id=Var2)
+    df %<>% mutate(ixn = ixn) %>%
+      full_join(mv_expand) %>% dplyr::select(-ixn)
+    return(df)
+  }
+  
+  coords_latent_knots %<>% expand_to_mv(sort_mv_id)
+  
+  coords_data <- bind_rows(coords %>% 
+                             as.data.frame() %>%
+                             dplyr::select(-ix) %>%
+                             mutate(res=max_res+1) %>% cbind(sort_mv_id),
+                           coords_latent_knots) 
+  
+  
+  cat("Partitioning...\n")
+  for(res in 1:max_res){
+    resname <- "blockres_{res}" %>% glue::glue()
+    cat("Level:", res)
+    blocking <- coords_data %>% 
+      dplyr::select(-res, -contains("blockres_"), -sort_mv_id) %>% 
+      unique() %>%
+      as.matrix() %>%
+      spamtree:::axis_parallel(thresholds[[res]], 4) %>%
+      dplyr::select(contains("Var"), block) %>%
+      rename(!!sym(resname) := block) 
+    #blocking %<>% expand_to_mv(sort_mv_id)
+    
+    coords_data %<>% left_join(blocking, by=join_vars)
+    cat(".\n")
+  }
+  
+  coords_data %<>% 
+    mutate(!!sym(paste0("blockres_", max_res+1)) := !!sym(paste0("blockres_", max_res)))
+  parchi_relations <- coords_data %>% 
+    dplyr::select(res, contains("blockres_")) %>% 
+    unique()
+  
+  if(F){
+    valid_blocks <- parchi_relations %>% 
+      filter(res == max_res+1) %>% 
+      dplyr::pull(!!sym(paste0("blockres_", max_res+1))) %>%
+      unique()
+    coords_data %<>% filter(!!sym(paste0("blockres_", max_res+1)) %in% valid_blocks)
+  }
+  
+  
+  max_block_number <- 0
+  for(i in 1:(max_res+1)){
+    blockname <- sprintf("blockres_%d", i)
+    coords_data %<>% 
+      mutate(!!sym(paste0("blockres_", i)) := as.numeric(factor(as.character(!!sym(paste0("blockres_", i)))))) %>%
+      mutate(!!sym(blockname) := !!sym(blockname) + max_block_number)
+    max_block_number <- max(coords_data %>% pull(!!sym(blockname)))
+  }
+  
+  coords_data %<>% mutate(block = coords_data %>% apply(1, function(rr) rr[sprintf("blockres_%d", rr["res"])]))
+  trash_blocks <- coords_data %>% dplyr::select(contains("blockres_")) %>% as.matrix() %>% is_greater_than(coords_data$block)
+  trash_blocks[trash_blocks==T] <- NA
+  trash_blocks[trash_blocks==F] <- 1
+
+  coords_data[,grepl("blockres_", colnames(coords_data))] <-
+    coords_data[,grepl("blockres_", colnames(coords_data))] * trash_blocks
+  
+  for(i in 1:max_res){
+    blockname <- sprintf("blockres_%d", i)
+    nextres_block <- sprintf("blockres_%d", i+1)
+    count_empty_children <- coords_data %>% group_by(!!sym(blockname)) %>% summarise(size=sum(!is.na(!!sym(nextres_block)))) %>% 
+      filter(complete.cases(!!sym(blockname)))
+    empty_children <- count_empty_children %>% filter(size==0) %>% `[`(,blockname) %>% as.matrix() %>% as.numeric()
+    coords_data %<>% filter(!(!!sym(blockname) %in% empty_children))
+    #coords_data %>% filter(blockres_6 == 435)
+  }
+  
+  
+  #coords_data <- coords_data %>% 
+  #  filter(complete.cases(!!sym(paste0("blockres_",max_res+1))))
+  parchi_before <- coords_data %>% 
+    dplyr::select(contains("blockres_")) %>% 
+    unique() %>% arrange(!!!syms(paste0("blockres_", 1:(max_res+1))))
+  
+  max_block_number <- 0
+  for(i in 1:(max_res+1)){
+    blockname <- sprintf("blockres_%d", i)
+    coords_data %<>% 
+      mutate(!!sym(paste0("blockres_", i)) := as.numeric(factor(as.character(!!sym(paste0("blockres_", i)))))) %>%
+      mutate(
+        block_unnorm = !!sym(blockname),
+        !!sym(blockname) := !!sym(blockname) + max_block_number)
+    max_block_number <- max(coords_data %>% pull(!!sym(blockname)), na.rm=T)
+    
+    
+  }
+  
+  coords_data %<>% mutate(block = coords_data %>% apply(1, function(rr) rr[sprintf("blockres_%d", rr["res"])]))
+  
+  
+  parchi_relations <- coords_data %>% 
+    dplyr::select(contains("blockres_")) %>% 
+    arrange(!!!syms(paste0("blockres_",1:max_res)))
+  
+  parchi_map <- parchi_relations %>% unique() %>% arrange(!!!syms(paste0("blockres_", 1:(max_res+1))))
+  
+  if(F){
+    remapping <- coords_mapparchi %>% dplyr::select(block_unnorm, !!sym(blockname)) %>% 
+      unique() %>% as.matrix()
+    focus_coords <- coords_data %>% dplyr::select(!!sym(blockname)) %>%
+      as.matrix()
+    remapped <- focus_coords %>% spamtree:::number_revalue(remapping[,1], remapping[,2])
+    coords_data %<>% mutate(!!sym(blockname) := ifelse(remapped==0, NA, remapped))
+    
+    
+    coords_summary <- knots_by_res[[res <- 3]] %>% 
+      rename(block = !!sym("blockres_{res}" %>% glue::glue())) %>%
+      group_by(block) %>% 
+      summarise(Var1=mean(Var1), Var2=mean(Var2),
+                block=block[1])
+    ggplot(coords_summary %>% arrange(Var1, Var2) %>% mutate(block=factor(as.numeric(factor(block)))), 
+           aes(Var1, Var2, label=block, fill=factor(block))) + 
+      geom_raster() + 
+      geom_text(size=4) + 
+      theme(legend.position="none")
+  }
+  
+  incoords <- cbind(coords, sort_mv_id) %>% as.data.frame()
+  coords_blocking <- coords_data %>% 
+    left_join(incoords, by=c(join_vars, "sort_mv_id"="sort_mv_id")) %>% 
+    #rename(block = !!sym(paste0("blockres_", max_res+1))) %>%
+    dplyr::select(contains("Var"), sort_mv_id, ix, block,#!!sym(paste0("blockres_", max_res+1)), 
+                  res) 
+  
+  
+  res_is_ref <- c(rep(1, max_res), 0)
+  
+  return(list(coords_blocking = coords_blocking,
+              parchi_map = parchi_map,
+              thresholds = thresholds,
+              res_is_ref = res_is_ref))
+}
+
 

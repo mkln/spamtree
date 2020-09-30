@@ -223,3 +223,83 @@ spamtree_mv <- function(y, X, coords, mv_id = rep(1, length(y)),
                 model_data = model_data
                 ))
 }
+
+
+#' @export
+spamtree_dev <- function(model_data){
+  # cell_size = (approximate) number of location for each block
+  # K = number of blocks at resolution L is K^(L-1), with L=1, ... , M.
+
+  list2env(model_data, environment())
+  
+  comp_time <- system.time({
+    results <- spamtree:::spamtree_mv_mcmc_devel(
+      y, X, Z, 
+      cx_all, 
+      sort_mv_id,
+      
+      blocking, 
+      gix_block,
+      res_is_ref,
+      
+      parents, children, 
+      F,
+      
+      block_names, block_groups,
+      indexing,
+      
+      set_unif_bounds,
+      
+      start_w, 
+      start_theta,
+      start_beta,
+      start_tausq,
+      
+      mcmc_mh_sd,
+      
+      mcmc_keep, mcmc_burn, mcmc_thin,
+      
+      num_threads,
+      
+      use_alg,
+      
+      mcmc_adaptive, 
+      mcmc_verbose, mcmc_debug, 
+      mcmc_printall,
+      
+      sample_beta, sample_tausq, sample_theta,
+      sample_w, sample_predicts) 
+  })
+  
+  list2env(results, environment())
+  
+  return(list(coords    = cx_all,
+              mv_id = mv_id,
+              beta_mcmc    = beta_mcmc,
+              tausq_mcmc   = tausq_mcmc,
+              theta_mcmc   = theta_mcmc,
+              
+              w_mcmc    = w_mcmc,
+              yhat_mcmc = yhat_mcmc,
+              
+              indexing = indexing,
+              parents_indexing = parents_indexing,
+              
+              runtime_all   = comp_time,
+              runtime_mcmc  = mcmc_time,
+              
+              Kxx_inv = Kxx_inv,
+              w_cond_mean_K = w_cond_mean_K,
+              Kcc = Kcc,
+              #block_names = block_names,
+              #block_is_reference = block_is_reference,
+              #u_by_block_groups = u_by_block_groups,
+              #n_actual_groups = n_actual_groups,
+              #Ciblocks = Ciblocks,
+              #Hblocks = Hblocks,
+              #ImHinv= ImHinv,
+              #Riblocks = Riblocks,
+              
+              model_data = model_data
+  ))
+}

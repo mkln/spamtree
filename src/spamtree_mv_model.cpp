@@ -715,7 +715,7 @@ void SpamTreeMV::fill_precision_blocks(SpamTreeMVData& data){
 void SpamTreeMV::decompose_margin_precision(SpamTreeMVData& data){
   Rcpp::Rcout << "[SpamTreeMV::decompose_margin_precision] start " << endl;
   for(int g=n_actual_groups-1; g>=0; g--){
-////#pragma omp parallel for
+//////***#pragma omp parallel for
     for(int i=0; i<u_by_block_groups(g).n_elem; i++){
       int u = u_by_block_groups(g)(i);
       
@@ -1262,7 +1262,7 @@ void SpamTreeMV::gibbs_sample_w_std(bool need_update){
  arma::uvec grpuvec = arma::ones<arma::uvec>(1) * grp;
  arma::uvec other_etas = arma::find(block_groups_labels != grp+1);
  
-#pragma omp parallel for 
+//***#pragma omp parallel for 
  for(int i=0; i<u_by_block_groups(g).n_elem; i++){
  int u = u_by_block_groups(g)(i);
  // eta_rpx is cube (location x q x grp)
@@ -1408,6 +1408,7 @@ void SpamTreeMV::predict_std(bool sampling=true, bool theta_update=true){
     //start = std::chrono::steady_clock::now();
     //start = std::chrono::steady_clock::now();
     if(theta_update){
+      
       mvCovAG20107_inplace(param_data.Kxc(u), coords, qvblock_c, 
                            parents_indexing(u), indexing(u), 
                            ai1, ai2, phi_i, thetamv, Dmat, false);
@@ -1422,16 +1423,16 @@ void SpamTreeMV::predict_std(bool sampling=true, bool theta_update=true){
       //arma::mat Kppi = arma::inv_sympd(Kpp);
       //arma::mat Kalt = Kcc - Kxc.t() * Kppi * Kxc;
       int u_par = parents(u)(parents(u).n_elem - 1);
-      int u_gp = parents(u_par)(parents(u_par).n_elem - 1);
-      
       //start = std::chrono::steady_clock::now();
       // updating the parent
       if(param_data.has_updated(u) == 0){
         if(limited_tree){
+          
           arma::mat Kxx = mvCovAG20107(coords, qvblock_c, indexing(u_par), indexing(u_par), ai1, ai2, phi_i, thetamv, Dmat, true);
           param_data.Kxx_inv(u_par) = arma::inv_sympd(Kxx);
         } else {
           // parents of this block have no children so they have not been updated
+          int u_gp = parents(u_par)(parents(u_par).n_elem - 1);
           invchol_block_inplace_direct(param_data.Kxx_invchol(u_par), param_data.Kxx_invchol(u_gp), 
                                        param_data.w_cond_mean_K(u_par), param_data.Rcc_invchol(u_par));
           param_data.Kxx_inv(u_par) = param_data.Kxx_invchol(u_par).t() * param_data.Kxx_invchol(u_par);

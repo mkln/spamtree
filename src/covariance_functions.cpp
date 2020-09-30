@@ -261,7 +261,7 @@ void mvCovAG20107_inplace(arma::mat& res,
   int d = coords.n_cols;
   int p = Dmat.n_cols;
   if((d == 2) & (p < 2)){
-    res = cexpcov(coords.rows(ind1), coords.rows(ind2), thetamv(0), thetamv(1), same);
+    res = cexpcov(coords.rows(ind1), coords.rows(ind2), ai1(0), thetamv(0), same);
   } else {
     int v_ix_i;
     int v_ix_j;
