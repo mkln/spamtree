@@ -80,8 +80,13 @@ arma::umat field_v_concat_um(arma::field<arma::umat> const& fuv){
 }
 
 
-arma::umat block_rotation_group(const arma::mat& coords, const arma::field<arma::uvec>& indexing,
-                                const arma::field<arma::uvec>& parents, const arma::vec& block_names){
+arma::umat block_rotation_group(const arma::mat& coords, 
+                                const arma::field<arma::uvec>& indexing,
+                                const arma::field<arma::uvec>& indexing_obs,
+                                const arma::field<arma::uvec>& parents, 
+                                const arma::vec& block_names, 
+                                const arma::field<arma::vec>& u_by_block_groups,
+                                int n_actual_groups){
   // based on the position of the block in the domain,
   // this function determines which sorting of the coordinate axes
   // makes the resulting covariance matrices be equal
@@ -90,9 +95,15 @@ arma::umat block_rotation_group(const arma::mat& coords, const arma::field<arma:
   
   for(int i=0; i<block_names.n_elem; i++){
     int u = block_names(i) - 1;
+    arma::uvec indexing_u = indexing(u);
+    arma::uvec at_last_level = arma::find(u_by_block_groups(n_actual_groups-1) == u, 1, "first");
+    if(at_last_level.n_elem > 0){
+      indexing_u = indexing_obs(u);
+    }
+      
     //Rcpp::Rcout << "i " << i << " u " << u << endl;
     //Rcpp::Rcout << arma::size(coords) << endl;
-    if((indexing(u).n_elem > 0) & (parents(u).n_elem > 0)){
+    if((indexing_u.n_elem > 0) & (parents(u).n_elem > 0)){
       int last_par = parents(u)(parents(u).n_elem - 1);
       arma::mat coords_parent;
       arma::rowvec parent_centroid;
@@ -104,13 +115,13 @@ arma::umat block_rotation_group(const arma::mat& coords, const arma::field<arma:
         coords_parent = coords.rows(indexing(last_par));
         parent_centroid = arma::sum(coords_parent, 0) / (.0+coords_parent.n_elem);
         
-        coords_block = coords.rows(indexing(u));
+        coords_block = coords.rows(indexing_u);
         block_centroid = arma::sum(coords_block, 0) / (.0+coords_block.n_elem);
         
       } catch (...) {
         Rcpp::Rcout << "got error " << endl;
         Rcpp::Rcout << indexing(last_par).t() << endl
-                    << indexing(u).t() << endl;
+                    << indexing_u.t() << endl;
       }
       
       //if(parents(u).n_elem > 0){
@@ -780,7 +791,7 @@ arma::field<arma::uvec> SpamTreeMVdevel::cacher(const arma::field<arma::mat>& so
     
     for(int i=0; i<u_by_block_groups(g).n_elem; i++){
       int u_target = u_by_block_groups(g)(i);
-      if(g==n_actual_groups - 1){
+      if(false & (g==n_actual_groups - 1)){
         targ_caching(g)(i) = u_target; // last level = observations = avoid caching
         // even though there may be some advantage with gridded obs...
       } else {
@@ -802,8 +813,6 @@ arma::field<arma::uvec> SpamTreeMVdevel::cacher(const arma::field<arma::mat>& so
         }
       }
     }
-    
-    
   }
   return targ_caching;
 }
@@ -821,11 +830,12 @@ void SpamTreeMVdevel::init_caching(){
   //arma::field<arma::umat> parents_indexing_rotated; // output from parents_indexing_order
   //arma::field<arma::umat> indexing_rotated; // output from indexing_order
   message("[block_rotation_group]");
-  rotgroup = block_rotation_group(coords, indexing, parents, block_names);
+  rotgroup = block_rotation_group(coords, indexing, indexing_obs, parents, block_names, u_by_block_groups, n_actual_groups);
   message("[parents_indexing_order]");
   parents_indexing_rotated = parents_indexing_order(coords, qvblock_c, rotgroup, indexing, indexing_obs, parents, block_names);
   message("[indexing_order]");
   indexing_rotated = indexing_order(coords, qvblock_c, rotgroup, indexing, parents, block_names);
+  
   indexing_obs_rotated = indexing_order(coords, qvblock_c, rotgroup, indexing_obs, parents, block_names);
   message("rotations done.");
   

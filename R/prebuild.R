@@ -32,10 +32,10 @@ prebuild <- function(y, X, coords,
     coords <- coords_q
     #mv_id <- matrix(1, nrow=n) %x% 1:q
     #Z <- X
-    cell_size=c(2,2); 
+    cell_size=c(4,4); 
     K=rep(2, ncol(coords)); 
     start_level <- 2
-    tree_depth <- 4
+    tree_depth <- 3
     last_not_reference <- F
     limited_tree <- F
     cherrypick_same_margin <- T
@@ -780,9 +780,6 @@ prebuild_dev <- function(y, X, coords,
                          tree_depth = 5,
                          mcmc        = list(keep=1000, burn=0, thin=1),
                          num_threads = 4,
-                         last_not_reference = NULL,
-                         limited_tree = NULL,
-                         K = NULL,
                          use_alg     = 'S', #S: standard, P: using residual process ortho decomp, R: P with recursive functions
                          settings    = list(adapting=T, mcmcsd=.2, verbose=F, debug=F, printall=F),
                          prior       = list(set_unif_bounds=NULL, btmlim=NULL, toplim=NULL, vlim=NULL),
@@ -790,7 +787,8 @@ prebuild_dev <- function(y, X, coords,
                          debug       = list(sample_beta=T, sample_tausq=T, 
                                             sample_theta=T, 
                                             sample_w=T, sample_predicts=T,
-                                            family="gaussian")
+                                            family="gaussian"),
+                         ...
 ){
   # cell_size = (approximate) number of location for each block
   if(!is.null(K)){

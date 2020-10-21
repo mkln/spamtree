@@ -374,7 +374,7 @@ make_tree_old <- function(coords, na_which, sort_mv_id,
 
 make_tree <- function(coords, na_which, sort_mv_id, 
                       axis_cell_size=c(5,5), K=c(2,2), 
-                      start_from=0, num_steps = Inf,
+                      start_level=0, tree_depth = Inf,
                       last_not_reference=T,
                       cherrypick_same_margin = T,
                       cherrypick_group_locations = T,
@@ -382,7 +382,7 @@ make_tree <- function(coords, na_which, sort_mv_id,
   # mvbias: 0 = treat all multivariate margins the same
   # >0 = prefer picking sparser margins for lower resolutions
 
-  max_res <- start_from + num_steps 
+  max_res <- start_level + tree_depth 
   
   mv_id_weights <- table(na_which, sort_mv_id) %>% `[`(1,) %>% 
     magrittr::raise_to_power(-mvbias) %>% magrittr::divide_by(sum(.))
@@ -414,7 +414,7 @@ make_tree <- function(coords, na_which, sort_mv_id,
   #LL <- floor( log(n_u_cells)/log(4)  )
   thresholds_list <- list()
   max_block_number <- 0
-  res <- start_from+1
+  res <- start_level+1
   
   timings <- rep(0, 3)
   
@@ -646,7 +646,7 @@ make_tree <- function(coords, na_which, sort_mv_id,
         parchi_map %<>% left_join(parchi_of_leftover)
       })
       
-      res_is_ref <- c(res_is_ref, ifelse(last_not_reference, 0, 1))
+      res_is_ref <- c(res_is_ref, 0)
     } else {
       coords_all <- coords_refset
     }
@@ -658,7 +658,7 @@ make_tree <- function(coords, na_which, sort_mv_id,
       ## missing locations = predictions: assign them to same block as their nearest-neighbor.
       column_select <- colnames(cx)[grepl("Var", colnames(coords_missing))]
       cx_missing <- coords_missing[,c(column_select, "ix", "sort_mv_id")]
-      coords_refset_sub <- coords_refset %>% filter(res %in% c(max(res)))
+      coords_refset_sub <- coords_refset %>% dplyr::filter(res %in% c(max(res)))
       
       #target_coords <- coords_refset_sub %>% select(contains("Var"))
       #nn_of_missing <- FNN::get.knnx(target_coords, cx_missing, k=1, algorithm="kd_tree")
@@ -675,6 +675,7 @@ make_tree <- function(coords, na_which, sort_mv_id,
           
           target_coords_same_margin <- coords_refset_sub %>% 
             #filter(sort_mv_id == vv) %>% 
+            #dplyr::filter(res == max(res)) %>%
             dplyr::select(contains("Var"), ix, block)
           
           cx_missing_same_margin <- cx_missing# %>%
@@ -693,11 +694,11 @@ make_tree <- function(coords, na_which, sort_mv_id,
           row_of_this <- which(cx_missing$sort_mv_id == vv)
           
           target_coords_same_margin <- coords_refset_sub %>% 
-            filter(sort_mv_id == vv) %>% 
+            dplyr::filter(sort_mv_id == vv) %>%
             dplyr::select(contains("Var"), ix, block)
           
           cx_missing_same_margin <- cx_missing %>%
-            filter(sort_mv_id == vv)
+            dplyr::filter(sort_mv_id == vv)
           
           nn_of_missing_same_margin <- FNN::get.knnx(target_coords_same_margin[,1:dd], 
                                                      cx_missing_same_margin[,1:dd], k=1, algorithm="kd_tree")
@@ -716,7 +717,7 @@ make_tree <- function(coords, na_which, sort_mv_id,
       res_of_missing <- max_res + 1 
       
       blockname = sprintf("block_res%02d", res_of_missing)
-      parent_blockname = sprintf("block_res%02d", res_of_missing - 1 - ifelse(last_not_reference, 1, 0))#- 1*(nrow(cx)>0))
+      parent_blockname = sprintf("block_res%02d", res_of_missing - 1 - 1*(nrow(cx)>0))
       
       coords_res_miss <- coords_missing %>% 
         as.data.frame() %>%
