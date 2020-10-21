@@ -1,137 +1,6 @@
-#' @export
-spamtree <- function(y, X, Z, coords, 
-                       cell_size=25, K=rep(2, ncol(coords)),
-                   iter        = list(keep=1000, burn=0, thin=1),
-                   family      = "gaussian",
-                   num_threads = 4,
-                   use_alg     = 'S', #S: standard, P: using residual process ortho decomp, R: P with recursive functions
-                   settings    = list(adapting=T, mcmcsd=.3, verbose=F, debug=F, printall=F),
-                   prior       = list(set_unif_bounds=NULL),
-                   starting    = list(beta=NULL, tausq=NULL, sigmasq=NULL, theta=NULL, w=NULL),
-                   debug       = list(sample_beta=T, sample_tausq=T, sample_sigmasq=T, sample_theta=T, sample_w=T, sample_predicts=T),
-                   model_data  = NULL
-){
-  # cell_size = (approximate) number of location for each block
-  # K = number of blocks at resolution L is K^(L-1), with L=1, ... , M.
-  if(is.null(model_data)){
-    model_data <- prebuild(y, X, Z, coords, cell_size, K, iter, family,
-                                num_threads, use_alg, settings, prior, starting, debug)
-  }
-
-  list2env(model_data, environment())
-  
-  if(use_alg != 'I'){
-    if(family != "gaussian"){
-      cat("Not implemented for non-Gaussian outputs.\n")
-      return(list())
-    }
-    
-    comp_time <- system.time({
-      results <- spamtree:::spamtree_mcmc(
-                                         y, X, Z, cx_all, blocking, res_is_ref,
-                                         
-                                         parents, children, 
-                                         block_names, block_groups,
-                                         indexing,
-                                         
-                                         set_unif_bounds,
-                                         
-                                         start_w, 
-                                         start_theta,
-                                         start_beta,
-                                         start_tausq,
-                                         start_sigmasq,
-                                         
-                                         mcmc_mh_sd,
-                                         
-                                         mcmc_keep, mcmc_burn, mcmc_thin,
-                                         
-                                         num_threads,
-                                         
-                                         use_alg,
-                                         
-                                         mcmc_adaptive, 
-                                         mcmc_verbose, mcmc_debug, 
-                                         mcmc_printall,
-                                         
-                                         sample_beta, sample_tausq, sample_sigmasq, sample_theta,
-                                         sample_w, sample_predicts) 
-    })
-    
-    list2env(results, environment())
-    return(list(coords    = cx_all,
-                
-                beta_mcmc    = beta_mcmc,
-                tausq_mcmc   = tausq_mcmc,
-                theta_mcmc   = theta_mcmc,
-                
-                w_mcmc    = w_mcmc,
-                yhat_mcmc = yhat_mcmc,
-                
-                eta_rpx = eta_rpx,
-                
-                indexing = indexing,
-                parents_indexing = parents_indexing,
-                
-                runtime_all   = comp_time,
-                runtime_mcmc  = mcmc_time,
-                
-                model_data = model_data))
-  } else {
-    
-    comp_time <- system.time({
-      results <- spamtree:::spamtree_bfirls(family, 
-                                            y, X, Z, cx_all, blocking, res_is_ref,
-                                         
-                                         parents, children, 
-                                         block_names, block_groups,
-                                         indexing,
-                                         
-                                         start_w, 
-                                         start_theta,
-                                         start_beta,
-                                         start_tausq,
-                                         start_sigmasq,
-                                         
-                                         mcmc_keep,
-                                         
-                                         num_threads,
-                                         
-                                         mcmc_verbose, mcmc_debug, 
-                                         mcmc_printall,
-                                         
-                                         sample_beta, 
-                                         sample_w, sample_predicts) 
-    })
-    
-    list2env(results, environment())
-    return(list(coords    = cx_all,
-                
-                beta    = beta,
-                #beta_iter = b_iter,
-                w    = w,
-                #w_iter = w_iter,
-                delta_iter = delta_iter,
-                
-                linear_predictor = linear_predictor,
-                
-                eta_rpx = eta_rpx,
-                
-                converged = converged,
-                block_ct_obs = block_ct_obs,
-                
-                iter = iter,
-                runtime_all   = comp_time,
-                runtime_mcmc  = alg_time,
-                
-                model_data = model_data))
-  }
-  
-  
-}
 
 #' @export
-spamtree_mv <- function(y, X, coords, mv_id = rep(1, length(y)),
+spamtree <- function(y, X, coords, mv_id = rep(1, length(y)),
                      cell_size=25, K=rep(2, ncol(coords)),
                      max_depth = Inf, use_leaves = T,
                      tree_recursive = T,
@@ -148,7 +17,7 @@ spamtree_mv <- function(y, X, coords, mv_id = rep(1, length(y)),
   # cell_size = (approximate) number of location for each block
   # K = number of blocks at resolution L is K^(L-1), with L=1, ... , M.
   if(is.null(model_data)){
-    model_data <- prebuild_mv(y, X, coords, mv_id, cell_size, K, 
+    model_data <- prebuild(y, X, coords, mv_id, cell_size, K, 
                               max_depth, use_leaves, !tree_recursive,
                               iter, 
                            num_threads, use_alg, settings, prior, starting, debug)
@@ -211,6 +80,7 @@ spamtree_mv <- function(y, X, coords, mv_id = rep(1, length(y)),
                 runtime_all   = comp_time,
                 runtime_mcmc  = mcmc_time,
                 
+                paramsd = paramsd,
                 #block_names = block_names,
                 #block_is_reference = block_is_reference,
                 #u_by_block_groups = u_by_block_groups,
@@ -222,6 +92,72 @@ spamtree_mv <- function(y, X, coords, mv_id = rep(1, length(y)),
                 
                 model_data = model_data
                 ))
+}
+
+Cinv_ <- function(y, X, coords, mv_id = rep(1, length(y)),
+                     cell_size=25, K=rep(2, ncol(coords)),
+                     max_depth = Inf, use_leaves = T,
+                     tree_recursive = T,
+                     
+                     iter        = list(keep=1000, burn=0, thin=1),
+                     num_threads = 4,
+                     use_alg     = 'S', #S: standard, P: using residual process ortho decomp, R: P with recursive functions
+                     settings    = list(adapting=T, mcmcsd=.3, verbose=F, debug=F, printall=F),
+                     prior       = list(set_unif_bounds=NULL),
+                     starting    = list(beta=NULL, tausq=NULL, sigmasq=NULL, theta=NULL, w=NULL),
+                     debug       = list(sample_beta=T, sample_tausq=T, sample_sigmasq=T, sample_theta=T, sample_w=T, sample_predicts=T),
+                     model_data  = NULL
+){
+  # cell_size = (approximate) number of location for each block
+  # K = number of blocks at resolution L is K^(L-1), with L=1, ... , M.
+  if(is.null(model_data)){
+    model_data <- prebuild(y, X, coords, mv_id, cell_size, K, 
+                           max_depth, use_leaves, !tree_recursive,
+                           iter, 
+                           num_threads, use_alg, settings, prior, starting, debug)
+  }
+  
+  list2env(model_data, environment())
+  
+  comp_time <- system.time({
+    results <- spamtree:::Cinv_builtin(
+      y, X, Z, 
+      cx_all, 
+      sort_mv_id,
+      blocking, 
+      gix_block,
+      res_is_ref,
+      
+      parents, children, 
+      limited_tree,
+      
+      block_names, block_groups,
+      indexing,
+      
+      set_unif_bounds,
+      
+      start_w, 
+      start_theta,
+      start_beta,
+      start_tausq,
+      
+      mcmc_mh_sd,
+      
+      mcmc_keep, mcmc_burn, mcmc_thin,
+      
+      num_threads,
+      
+      use_alg,
+      
+      mcmc_adaptive, 
+      mcmc_verbose, mcmc_debug, 
+      mcmc_printall,
+      
+      sample_beta, sample_tausq, sample_theta,
+      sample_w, sample_predicts) 
+  })
+  
+  return(results)
 }
 
 
@@ -246,7 +182,7 @@ spamtree_dev <- function(model_data){
       F,
       
       block_names, block_groups,
-      indexing,
+      indexing_knots, indexing_obs,
       
       set_unif_bounds,
       
@@ -282,7 +218,8 @@ spamtree_dev <- function(model_data){
               w_mcmc    = w_mcmc,
               yhat_mcmc = yhat_mcmc,
               
-              indexing = indexing,
+              indexing = indexing_knots,
+              indexing_obs = indexing_obs,
               parents_indexing = parents_indexing,
               
               runtime_all   = comp_time,
@@ -291,6 +228,9 @@ spamtree_dev <- function(model_data){
               Kxx_inv = Kxx_inv,
               w_cond_mean_K = w_cond_mean_K,
               Kcc = Kcc,
+              Kxc = Kxc,
+              Rcc_invchol = Rcc_invchol,
+              
               #block_names = block_names,
               #block_is_reference = block_is_reference,
               #u_by_block_groups = u_by_block_groups,
@@ -303,3 +243,4 @@ spamtree_dev <- function(model_data){
               model_data = model_data
   ))
 }
+

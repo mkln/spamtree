@@ -1,4 +1,5 @@
 axis_parallel <- function(coordsmat, thresholds, n_threads){
+
   
   tessellate_time <- system.time({
   
@@ -40,3 +41,4 @@ axis_parallel <- function(coordsmat, thresholds, n_threads){
   #cat("Partitioning run in ", as.numeric(tessellate_time["elapsed"]), "\n")
   return(result)
 }
+

@@ -25,7 +25,8 @@ Rcpp::List spamtree_mv_mcmc_devel(
     const arma::vec& layer_names,
     const arma::vec& layer_gibbs_group,
     
-    const arma::field<arma::uvec>& indexing,
+    const arma::field<arma::uvec>& indexing_knots,
+    const arma::field<arma::uvec>& indexing_obs,
     
     const arma::mat& set_unif_bounds_in,
     
@@ -129,7 +130,7 @@ Rcpp::List spamtree_mv_mcmc_devel(
                      
                      parents, children, limited_tree, 
                      layer_names, layer_gibbs_group,
-                     indexing,
+                     indexing_knots, indexing_obs,
                      
                      start_w_vec, beta, theta, 1.0/tausq, 
                      
@@ -178,7 +179,8 @@ Rcpp::List spamtree_mv_mcmc_devel(
   int msaved = 0;
   bool interrupted = false;
   
-  MHAdapter adaptivemc(param.n_elem, mcmc, metropolis_sd);
+  RAMAdapt adaptivemc(param.n_elem, //mcmc, 
+                        metropolis_sd);
   
   
   Rcpp::Rcout << "Running MCMC for " << mcmc << " iterations." << endl;
@@ -240,8 +242,9 @@ Rcpp::List spamtree_mv_mcmc_devel(
         // theta
         Rcpp::RNGScope scope;
         arma::vec new_param = param;
+        arma::vec U_update = arma::randn(param.n_elem);
         new_param = par_huvtransf_back(par_huvtransf_fwd(param, set_unif_bounds) + 
-          adaptivemc.paramsd * arma::randn(param.n_elem), set_unif_bounds);
+          adaptivemc.paramsd * U_update, set_unif_bounds);
         
         bool out_unif_bounds = unif_bounds(new_param, set_unif_bounds);
         //Rcpp::Rcout << "new phi: " << new_param << endl;
@@ -319,7 +322,8 @@ Rcpp::List spamtree_mv_mcmc_devel(
         adaptivemc.update_ratios();
         
         if(adapting){
-          adaptivemc.adapt(par_huvtransf_fwd(param, set_unif_bounds), m); // **
+          //adaptivemc.adapt(par_huvtransf_fwd(param, set_unif_bounds), m); // **
+          adaptivemc.adapt(U_update, exp(logaccept), m); // **
         }
         
         
@@ -337,9 +341,9 @@ Rcpp::List spamtree_mv_mcmc_devel(
       //need_update = true;
       need_update = arma::accu(abs(param - predict_param) > 1e-05);
       
-      if((mtree.predicting == true) & sample_predicts){
+      if(sample_predicts){
         // tell predict() if theta has changed because if not, we can avoid recalculating
-        //***mtree.predict(need_update);
+        mtree.predict(true);
         predict_param = param;
       }
       
@@ -462,7 +466,9 @@ Rcpp::List spamtree_mv_mcmc_devel(
       Rcpp::Named("mcmc_time") = mcmc_time/1000.0,
       Rcpp::Named("Kxx_inv") = mtree.param_data.Kxx_inv,
       Rcpp::Named("w_cond_mean_K") = mtree.param_data.w_cond_mean_K,
-      Rcpp::Named("Kcc") = mtree.param_data.Kcc
+      Rcpp::Named("Kcc") = mtree.param_data.Kcc,
+      Rcpp::Named("Kxc") = mtree.param_data.Kxc,
+      Rcpp::Named("Rcc_invchol") = mtree.param_data.Rcc_invchol
     );
     
   /*} catch (const std::exception &exc) {

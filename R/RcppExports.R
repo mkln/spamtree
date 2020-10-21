@@ -5,20 +5,8 @@ vec_to_symmat <- function(x) {
     .Call(`_spamtree_vec_to_symmat`, x)
 }
 
-xCovHUV <- function(coords, ind1, ind2, cparams, Dmat, same = FALSE) {
-    .Call(`_spamtree_xCovHUV`, coords, ind1, ind2, cparams, Dmat, same)
-}
-
-mvCovAG20107 <- function(coords, qv_block, ind1, ind2, ai1, ai2, phi_i, thetamv, Dmat, same = FALSE) {
-    .Call(`_spamtree_mvCovAG20107`, coords, qv_block, ind1, ind2, ai1, ai2, phi_i, thetamv, Dmat, same)
-}
-
-mvCovAG20107_cx <- function(coords1, qv_block1, coords2, qv_block2, ai1, ai2, phi_i, thetamv, Dmat, same = FALSE) {
-    .Call(`_spamtree_mvCovAG20107_cx`, coords1, qv_block1, coords2, qv_block2, ai1, ai2, phi_i, thetamv, Dmat, same)
-}
-
-dense_to_spatialsparse <- function(X) {
-    .Call(`_spamtree_dense_to_spatialsparse`, X)
+mvCovAG20107x <- function(coords1, qv_block1, coords2, qv_block2, ai1, ai2, phi_i, thetamv, Dmat, same = FALSE) {
+    .Call(`_spamtree_mvCovAG20107x`, coords1, qv_block1, coords2, qv_block2, ai1, ai2, phi_i, thetamv, Dmat, same)
 }
 
 find_not_nan <- function(infield, filtering) {
@@ -61,47 +49,11 @@ number_revalue <- function(original_mat, from_val, to_val) {
     .Call(`_spamtree_number_revalue`, original_mat, from_val, to_val)
 }
 
-Ci_ij <- function(block_i, block_j, coords, blocking, parents, children, block_names, indexing, theta, Dmat) {
-    .Call(`_spamtree_Ci_ij`, block_i, block_j, coords, blocking, parents, children, block_names, indexing, theta, Dmat)
-}
-
-Ci_udu <- function(Ci, parents, block_names, indexing) {
-    .Call(`_spamtree_Ci_udu`, Ci, parents, block_names, indexing)
-}
-
-Ci_UDU_with_H2 <- function(Ci, parents, block_names, indexing) {
-    .Call(`_spamtree_Ci_UDU_with_H2`, Ci, parents, block_names, indexing)
-}
-
-Ci_UDU_with_H <- function(Ci, parents, block_names, indexing) {
-    .Call(`_spamtree_Ci_UDU_with_H`, Ci, parents, block_names, indexing)
-}
-
-ImHinverse <- function(ImH, parents, children, block_names, indexing) {
-    .Call(`_spamtree_ImHinverse`, ImH, parents, children, block_names, indexing)
-}
-
-spamtree_Cinv <- function(coords, mv_id, blocking, parents, block_names, indexing, ai1, ai2, phi_i, thetamv, Dmat, num_threads = 1L, verbose = FALSE, debug = FALSE) {
-    .Call(`_spamtree_spamtree_Cinv`, coords, mv_id, blocking, parents, block_names, indexing, ai1, ai2, phi_i, thetamv, Dmat, num_threads, verbose, debug)
-}
-
-spamtree_sample <- function(coords, mv_id, blocking, parents, block_names, indexing, ai1, ai2, phi_i, thetamv, Dmat, num_threads = 1L, verbose = FALSE, debug = FALSE) {
-    .Call(`_spamtree_spamtree_sample`, coords, mv_id, blocking, parents, block_names, indexing, ai1, ai2, phi_i, thetamv, Dmat, num_threads, verbose, debug)
-}
-
-spamtree_mcmc <- function(y, X, Z, coords, blocking, res_is_ref, parents, children, layer_names, layer_gibbs_group, indexing, set_unif_bounds_in, start_w, theta, beta, tausq, sigmasq, mcmcsd, mcmc_keep = 100L, mcmc_burn = 100L, mcmc_thin = 1L, num_threads = 1L, use_alg = 'S', adapting = FALSE, verbose = FALSE, debug = FALSE, printall = FALSE, sample_beta = TRUE, sample_tausq = TRUE, sample_sigmasq = TRUE, sample_theta = TRUE, sample_w = TRUE, sample_predicts = TRUE) {
-    .Call(`_spamtree_spamtree_mcmc`, y, X, Z, coords, blocking, res_is_ref, parents, children, layer_names, layer_gibbs_group, indexing, set_unif_bounds_in, start_w, theta, beta, tausq, sigmasq, mcmcsd, mcmc_keep, mcmc_burn, mcmc_thin, num_threads, use_alg, adapting, verbose, debug, printall, sample_beta, sample_tausq, sample_sigmasq, sample_theta, sample_w, sample_predicts)
-}
-
-spamtree_bfirls <- function(family, y, X, Z, coords, blocking, res_is_ref, parents, children, layer_names, layer_gibbs_group, indexing, start_w, theta, beta, tausq, sigmasq, maxiter = 100L, num_threads = 1L, verbose = FALSE, debug = FALSE, printall = FALSE, sample_beta = TRUE, sample_w = TRUE, sample_predicts = TRUE) {
-    .Call(`_spamtree_spamtree_bfirls`, family, y, X, Z, coords, blocking, res_is_ref, parents, children, layer_names, layer_gibbs_group, indexing, start_w, theta, beta, tausq, sigmasq, maxiter, num_threads, verbose, debug, printall, sample_beta, sample_w, sample_predicts)
-}
-
 spamtree_mv_mcmc <- function(y, X, Z, coords, mv_id, blocking, gix_block, res_is_ref, parents, children, limited_tree, layer_names, layer_gibbs_group, indexing, set_unif_bounds_in, start_w, theta, beta, tausq, mcmcsd, mcmc_keep = 100L, mcmc_burn = 100L, mcmc_thin = 1L, num_threads = 1L, use_alg = 'S', adapting = FALSE, verbose = FALSE, debug = FALSE, printall = FALSE, sample_beta = TRUE, sample_tausq = TRUE, sample_theta = TRUE, sample_w = TRUE, sample_predicts = TRUE) {
     .Call(`_spamtree_spamtree_mv_mcmc`, y, X, Z, coords, mv_id, blocking, gix_block, res_is_ref, parents, children, limited_tree, layer_names, layer_gibbs_group, indexing, set_unif_bounds_in, start_w, theta, beta, tausq, mcmcsd, mcmc_keep, mcmc_burn, mcmc_thin, num_threads, use_alg, adapting, verbose, debug, printall, sample_beta, sample_tausq, sample_theta, sample_w, sample_predicts)
 }
 
-spamtree_mv_mcmc_devel <- function(y, X, Z, coords, mv_id, blocking, gix_block, res_is_ref, parents, children, limited_tree, layer_names, layer_gibbs_group, indexing, set_unif_bounds_in, start_w, theta, beta, tausq, mcmcsd, mcmc_keep = 100L, mcmc_burn = 100L, mcmc_thin = 1L, num_threads = 1L, use_alg = 'S', adapting = FALSE, verbose = FALSE, debug = FALSE, printall = FALSE, sample_beta = TRUE, sample_tausq = TRUE, sample_theta = TRUE, sample_w = TRUE, sample_predicts = TRUE) {
-    .Call(`_spamtree_spamtree_mv_mcmc_devel`, y, X, Z, coords, mv_id, blocking, gix_block, res_is_ref, parents, children, limited_tree, layer_names, layer_gibbs_group, indexing, set_unif_bounds_in, start_w, theta, beta, tausq, mcmcsd, mcmc_keep, mcmc_burn, mcmc_thin, num_threads, use_alg, adapting, verbose, debug, printall, sample_beta, sample_tausq, sample_theta, sample_w, sample_predicts)
+spamtree_mv_mcmc_devel <- function(y, X, Z, coords, mv_id, blocking, gix_block, res_is_ref, parents, children, limited_tree, layer_names, layer_gibbs_group, indexing_knots, indexing_obs, set_unif_bounds_in, start_w, theta, beta, tausq, mcmcsd, mcmc_keep = 100L, mcmc_burn = 100L, mcmc_thin = 1L, num_threads = 1L, use_alg = 'S', adapting = FALSE, verbose = FALSE, debug = FALSE, printall = FALSE, sample_beta = TRUE, sample_tausq = TRUE, sample_theta = TRUE, sample_w = TRUE, sample_predicts = TRUE) {
+    .Call(`_spamtree_spamtree_mv_mcmc_devel`, y, X, Z, coords, mv_id, blocking, gix_block, res_is_ref, parents, children, limited_tree, layer_names, layer_gibbs_group, indexing_knots, indexing_obs, set_unif_bounds_in, start_w, theta, beta, tausq, mcmcsd, mcmc_keep, mcmc_burn, mcmc_thin, num_threads, use_alg, adapting, verbose, debug, printall, sample_beta, sample_tausq, sample_theta, sample_w, sample_predicts)
 }
 

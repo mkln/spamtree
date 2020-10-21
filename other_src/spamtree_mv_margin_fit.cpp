@@ -6,7 +6,6 @@
 // inactive but dont erase
 // needs update with new mh_adapt.h
 
-/*
 arma::mat rebuildC(const arma::field<arma::mat>& Cf, const arma::vec& block_names, const arma::uvec& block_is_reference, std::string part="all"){
   
   arma::uvec cdim = arma::zeros<arma::uvec>(Cf.n_cols + 1);
@@ -652,5 +651,3 @@ Rcpp::List spamtree_mv_margin_mcmc(
   }
   
 }
-
-*/

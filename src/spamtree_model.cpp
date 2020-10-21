@@ -1,7 +1,5 @@
 #define ARMA_DONT_PRINT_ERRORS
-#include "spamtree_mv_model.h"
-
-
+#include "spamtree_model.h"
 
 void SpamTreeMV::message(string s){
   if(verbose & debug){
@@ -14,7 +12,6 @@ SpamTreeMV::SpamTreeMV(){
 }
 
 SpamTreeMV::SpamTreeMV(
-  const std::string& family_in,
   const arma::mat& y_in, 
   const arma::mat& X_in, 
   const arma::mat& Z_in,
@@ -59,8 +56,6 @@ SpamTreeMV::SpamTreeMV(
   debug = debugging;
   
   message("SpamTreeMV::SpamTreeMV assign values.");
-  
-  family = family_in;
   
   y                   = y_in;
   X                   = X_in;
@@ -127,14 +122,6 @@ SpamTreeMV::SpamTreeMV(
    }
    }*/
   
-  if(dd == 2){
-    int n_cbase = q > 2? 3: 1;
-    npars = 3*q + n_cbase;
-  } else {
-    Rcpp::Rcout << "d>2 not implemented yet " << endl;
-    throw 1;
-  }
-  
   printf("%d observed locations, %d to predict, %d total\n",
          n, y.n_elem-n, y.n_elem);
   
@@ -192,6 +179,9 @@ SpamTreeMV::SpamTreeMV(
   init_model_data(theta_in);
   
   //find_common_descendants();
+  
+  // initialize covariance model
+  covpars = CovarianceParams(dd, q);
   
   if(verbose){
     end_overall = std::chrono::steady_clock::now();
@@ -499,9 +489,8 @@ void SpamTreeMV::init_model_data(const arma::vec& theta_in){
 
 arma::mat SpamTreeMV::Ci_ij(int block_i, int block_j, SpamTreeMVData& data){
   // this is a (slow) utility to compute the ij block of the precision matrix
-  
-  theta_transform(data);
-  
+  arma::vec cparams = data.theta;
+  covpars.transform(cparams);
   
   arma::uvec common_descendants = block_common_descendants(block_i, block_j); 
 
@@ -560,9 +549,9 @@ arma::mat SpamTreeMV::Ci_ij(int block_i, int block_j, SpamTreeMVData& data){
         //  start_ix += n_par_block;
         //}
         
-        //arma::mat Kcc = mvCovAG20107(coords, qvblock_c, indexing(block_k), indexing(block_k), ai1, ai2, phi_i, thetamv, Dmat, true);
-        //arma::mat Kxxi = arma::inv_sympd(mvCovAG20107(coords, qvblock_c, parents_indexing(block_k), parents_indexing(block_k), ai1, ai2, phi_i, thetamv, Dmat, true));
-        //arma::mat Kcx = mvCovAG20107(coords, qvblock_c, indexing(block_k), parents_indexing(block_k), ai1, ai2, phi_i, thetamv, Dmat, false);
+        //arma::mat Kcc = Covariancef(coords, qvblock_c, indexing(block_k), indexing(block_k), ai1, ai2, phi_i, thetamv, Dmat, true);
+        //arma::mat Kxxi = arma::inv_sympd(Covariancef(coords, qvblock_c, parents_indexing(block_k), parents_indexing(block_k), ai1, ai2, phi_i, thetamv, Dmat, true));
+        //arma::mat Kcx = Covariancef(coords, qvblock_c, indexing(block_k), parents_indexing(block_k), ai1, ai2, phi_i, thetamv, Dmat, false);
         arma::mat H_k = data.w_cond_mean_K(block_k); //Kcx * Kxxi;
         arma::mat Ri_k;
         
@@ -817,23 +806,6 @@ void SpamTreeMV::get_loglik_w_std(SpamTreeMVData& data){
   //print_data(data);
 }
 
-void SpamTreeMV::theta_transform(const SpamTreeMVData& data){
-  // from vector to all covariance components
-  int k = data.theta.n_elem - npars; // number of cross-distances = p(p-1)/2
-  
-  arma::vec cparams = data.theta.subvec(0, npars - 1);
-  n_cbase = q > 2? 3: 1;
-  ai1 = cparams.subvec(0, q-1);
-  ai2 = cparams.subvec(q, 2*q-1);
-  phi_i = cparams.subvec(2*q, 3*q-1);
-  thetamv = cparams.subvec(3*q, 3*q+n_cbase-1);
-  
-  if(k>0){
-    Dmat = vec_to_symmat(data.theta.subvec(npars, npars + k - 1));
-  } else {
-    Dmat = arma::zeros(1,1);
-  }
-}
 
 bool SpamTreeMV::get_loglik_comps_w(SpamTreeMVData& data){
   // S=standard gibbs (cheapest), P=residual process, R=residual process using recursive functions
@@ -845,7 +817,8 @@ bool SpamTreeMV::get_loglik_comps_w_std(SpamTreeMVData& data){
   message("[get_loglik_comps_w_std] start. ");
   
   // arma::vec timings = arma::zeros(7);
-  theta_transform(data);
+  arma::vec cparams = data.theta;
+  covpars.transform(cparams);
   // cycle through the resolutions starting from the bottom
   
   int errtype = -1;
@@ -863,7 +836,7 @@ bool SpamTreeMV::get_loglik_comps_w_std(SpamTreeMVData& data){
       
       if(parents(u).n_elem == 0){
         //start = std::chrono::steady_clock::now();
-        arma::mat Kcc = mvCovAG20107(coords, qvblock_c, indexing(u), indexing(u), ai1, ai2, phi_i, thetamv, Dmat, true);
+        arma::mat Kcc = Covariancef(coords, qvblock_c, indexing(u), indexing(u), covpars, true);
         
         try{
           data.Kxx_invchol(u) = arma::inv(arma::trimatl(arma::chol(Kcc, "lower")));
@@ -885,14 +858,14 @@ bool SpamTreeMV::get_loglik_comps_w_std(SpamTreeMVData& data){
         int last_par = parents(u)(parents(u).n_elem - 1);
         //arma::mat LAi = Kxx_invchol(last_par);
         
-        mvCovAG20107_inplace(data.Kxc(u), coords, qvblock_c, parents_indexing(u), indexing(u), ai1, ai2, phi_i, thetamv, Dmat, false);
+        Covariancef_inplace(data.Kxc(u), coords, qvblock_c, parents_indexing(u), indexing(u), covpars, false);
         arma::vec w_pars = w.rows(parents_indexing(u));
         data.w_cond_mean_K(u) = data.Kxc(u).t() * data.Kxx_inv(last_par);
         w_x -= data.w_cond_mean_K(u) * w_pars;
         
         if(res_is_ref(g) == 1){
           //start = std::chrono::steady_clock::now();
-          arma::mat Kcc = mvCovAG20107(coords, qvblock_c, indexing(u), indexing(u), ai1, ai2, phi_i, thetamv, Dmat, true);
+          arma::mat Kcc = Covariancef(coords, qvblock_c, indexing(u), indexing(u), covpars, true);
           
           try {
               
@@ -934,7 +907,7 @@ bool SpamTreeMV::get_loglik_comps_w_std(SpamTreeMVData& data){
             int first_ix = ix;
             int last_ix = ix;
             //start = std::chrono::steady_clock::now();
-            arma::mat Kcc = mvCovAG20107(coords, qvblock_c, uix, uix, ai1, ai2, phi_i, thetamv, Dmat, true);
+            arma::mat Kcc = Covariancef(coords, qvblock_c, uix, uix, covpars, true);
             //end = std::chrono::steady_clock::now();
             //timings(5) += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
             
@@ -974,11 +947,11 @@ bool SpamTreeMV::get_loglik_comps_w_std(SpamTreeMVData& data){
   
   if(errtype > 0){
     Rcpp::Rcout << "Cholesky failed at some point. Here's the value of theta that caused this" << endl;
-    Rcpp::Rcout << "ai1: " << ai1.t() << endl
-                << "ai2: " << ai2.t() << endl
-                << "phi_i: " << phi_i.t() << endl
-                << "thetamv: " << thetamv.t() << endl
-                << "and Dmat: " << Dmat << endl;
+    Rcpp::Rcout << "ai1: " << covpars.ai1.t() << endl
+                << "ai2: " << covpars.ai2.t() << endl
+                << "phi_i: " << covpars.phi_i.t() << endl
+                << "thetamv: " << covpars.thetamv.t() << endl
+                << "and Dmat: " << covpars.Dmat << endl;
     Rcpp::Rcout << " -- auto rejected and proceeding." << endl;
     return false;
   }
@@ -1395,7 +1368,8 @@ void SpamTreeMV::predict_std(bool sampling=true, bool theta_update=true){
   message("[predict_std] start. ");
   
   //arma::vec timings = arma::zeros(5);
-  theta_transform(param_data);
+  arma::vec cparams = param_data.theta;
+  covpars.transform(cparams);
   
   //arma::vec timings = arma::zeros(4);
   
@@ -1409,9 +1383,9 @@ void SpamTreeMV::predict_std(bool sampling=true, bool theta_update=true){
     //start = std::chrono::steady_clock::now();
     if(theta_update){
       
-      mvCovAG20107_inplace(param_data.Kxc(u), coords, qvblock_c, 
+      Covariancef_inplace(param_data.Kxc(u), coords, qvblock_c, 
                            parents_indexing(u), indexing(u), 
-                           ai1, ai2, phi_i, thetamv, Dmat, false);
+                           covpars, false);
       
       //end = std::chrono::steady_clock::now();
       //timings(0) += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
@@ -1428,7 +1402,7 @@ void SpamTreeMV::predict_std(bool sampling=true, bool theta_update=true){
       if(param_data.has_updated(u) == 0){
         if(limited_tree){
           
-          arma::mat Kxx = mvCovAG20107(coords, qvblock_c, indexing(u_par), indexing(u_par), ai1, ai2, phi_i, thetamv, Dmat, true);
+          arma::mat Kxx = Covariancef(coords, qvblock_c, indexing(u_par), indexing(u_par), covpars, true);
           param_data.Kxx_inv(u_par) = arma::inv_sympd(Kxx);
         } else {
           // parents of this block have no children so they have not been updated
@@ -1461,7 +1435,7 @@ void SpamTreeMV::predict_std(bool sampling=true, bool theta_update=true){
         arma::uvec uix = ones * indexing(u)(ix);
         int first_ix = ix;
         int last_ix = ix;
-        arma::mat Kcc = mvCovAG20107(coords, qvblock_c, uix, uix, ai1, ai2, phi_i, thetamv, Dmat, true);
+        arma::mat Kcc = Covariancef(coords, qvblock_c, uix, uix, covpars, true);
         //arma::uvec ix_q = arma::regspace<arma::uvec>(ix*q, ix*q+q-1);
         arma::mat Rchol;
         arma::mat Ktemp = Kcc - 

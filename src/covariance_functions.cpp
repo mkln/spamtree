@@ -3,6 +3,51 @@
 
 using namespace std;
 
+CovarianceParams::CovarianceParams(){
+  q = 0;
+  npars = 0;
+}
+CovarianceParams::CovarianceParams(int dd, int q_in){
+  q = q_in;
+  
+  covariance_model = -1;
+  if(dd == 2){
+    covariance_model = 0;
+    n_cbase = q > 2? 3: 1;
+    npars = 3*q + n_cbase;
+  } else {
+    if(q_in > 1){
+      Rcpp::Rcout << "Multivariate on many inputs not implemented yet." << endl;
+      throw 1;
+    }
+    covariance_model = 1;
+  }
+}
+
+void CovarianceParams::transform(const arma::vec& theta){
+  if(covariance_model == 0){
+    // multivariate spatial
+    // from vector to all covariance components
+    int k = theta.n_elem - npars; // number of cross-distances = p(p-1)/2
+    arma::vec cparams = theta.subvec(0, npars - 1);
+    ai1 = cparams.subvec(0, q-1);
+    ai2 = cparams.subvec(q, 2*q-1);
+    phi_i = cparams.subvec(2*q, 3*q-1);
+    thetamv = cparams.subvec(3*q, 3*q+n_cbase-1);
+    
+    if(k>0){
+      Dmat = vec_to_symmat(theta.subvec(npars, npars + k - 1));
+    } else {
+      Dmat = arma::zeros(1,1);
+    }
+  }
+  if(covariance_model == 1){
+    // univariate with several inputs
+    sigmasq = theta(0);
+    kweights = theta.subvec(1, theta.n_elem-1);
+  }
+}
+
 arma::mat vec_to_symmat(const arma::vec& x){
   int k = x.n_elem; // = p(p-1)/2
   int p = ( 1 + sqrt(1 + 8*k) )/2;
@@ -38,190 +83,6 @@ arma::mat cexpcov(const arma::mat& x, const arma::mat& y, const double& sigmasq,
   }
 }
 
-double xCovHUV_base(const double& h, const double& u, const double& v, 
-                    const arma::vec& params, const int& q, const int& dim){
-  //Rcpp::Rcout << "h: " << h << " u: " << u << " v: " << v << " | q: " << q << " dim: " << dim << endl;
-  // Gneiting 2002 uses phi and psi as above ( beta here is kappa in covariance_functions.cpp )
-  // hsq = ||h||^2, u = |u|^2 are squared norms. v = d_ij is "distance" between var. i and var. j
-  // d=2
-  // we also set 
-  // alpha=0.5
-  // gamma=0.5 
-  if(dim == 3){
-    if(q > 2){
-      // full multivariate
-      // sigmasq + 5 params
-      double sigmasq   = params(0);
-      double a_psi2    = params(1);
-      double beta_psi2 = params(2);
-      double a_psi1    = params(3);
-      double beta_psi1 = params(4);
-      double c_phi1    = params(5);
-      double psi2_sqrt = sqrt_fpsi(v,           a_psi2, beta_psi2); // alpha_psi2=0.5
-      double psi1_sqrt = sqrt_fpsi(u/psi2_sqrt, a_psi1, beta_psi1); // alpha_psi1=0.5
-      double phi1      = fphi(h/psi1_sqrt, c_phi1); // gamma_phi1=0.5
-      
-      return sigmasq / (psi1_sqrt * psi1_sqrt) * phi1 / psi2_sqrt;
-    } else {
-      if(q == 2){
-        // multivariate but fixing a_psi2=1, beta_psi2=1 ?
-        // sigmasq + 3 params + v
-        double sigmasq   = params(0);
-        //double a_psi2    = 1.0;
-        //double beta_psi2 = 1.0;
-        double a_psi1    = params(1);
-        double beta_psi1 = params(2);
-        double c_phi1    = params(3);
-        double psi2_sqrt = sqrt(v + 1.0);//sqrt_fpsi(v,           a_psi2, beta_psi2); // alpha_psi2=0.5
-        
-        double psi1_sqrt = sqrt_fpsi(u/psi2_sqrt, a_psi1, beta_psi1); // alpha_psi1=0.5
-        double phi1      = fphi(h/psi1_sqrt, c_phi1); // gamma_phi1=0.5
-        
-        return sigmasq / (psi1_sqrt * psi1_sqrt) * phi1 / psi2_sqrt;
-      } else {
-        // univariate spacetime -- using Gneiting 2002
-        // multivariate but fixing a_psi2=1, beta_psi2=1 ?
-        // sigmasq + 3 params
-        double sigmasq   = params(0);
-        double a_psi1    = params(1);
-        double beta_psi1 = params(2);
-        double c_phi1    = params(3);
-        double psi1_sqrt = sqrt_fpsi(u, a_psi1, beta_psi1); // alpha_psi1=0.5
-        double phi1      = fphi(h/psi1_sqrt, c_phi1); // gamma_phi1=0.5
-        
-        return sigmasq / (psi1_sqrt * psi1_sqrt) * phi1;
-      }
-    }
-  } else {
-    // no time, only space
-    if(q > 2){// number of variables - which we consider q=k
-      /*
-       // space-variable nonseparable psi1=const psi2=const in Apanasovich&Genton2010 (4)
-       double sigmasq   = params(0);
-       double a_psi4    = params(1);
-       double beta_psi4 = params(2);
-       double a_psi3    = params(3);
-       double beta_psi3 = params(4);
-       double c_phi1    = params(5);
-       double c_phi3    = 1.0;
-       
-       double psi4_sqrt = sqrt_fpsi(v, a_psi4, beta_psi4);
-       double psi3_sqrt = sqrt_fpsi(h, a_psi3, beta_psi3);
-       double phi1      = fphi(h, c_phi1);
-       double phi3      = fphi(v/psi3_sqrt, c_phi3);
-       
-       double psi3_sqrt_powq = psi3_sqrt;
-       for(int i=0; i<q-1; i++){
-       psi3_sqrt_powq *= psi3_sqrt_powq;
-       }
-       return sigmasq / (psi3_sqrt_powq * psi4_sqrt) * phi1 * phi3;*/
-      
-      // multivariate  space. v plays role of time of Gneiting 2002
-      // sigmasq + 3 params
-      double sigmasq   = params(0);
-      double a_psi1    = params(1);
-      double beta_psi1 = params(2);
-      double c_phi1    = params(3);
-      double psi1_sqrt = sqrt_fpsi(v, a_psi1, beta_psi1); // alpha_psi1=0.5
-      double phi1      = fphi(h/psi1_sqrt, c_phi1); // gamma_phi1=0.5
-      
-      return sigmasq / (psi1_sqrt * psi1_sqrt) * phi1;
-    } else {
-      if(q == 2){
-        // multivariate  space. v plays role of time of Gneiting 2002
-        // sigmasq + 1 params + v
-        double sigmasq   = params(0);
-        //double a_psi1    = params(1);
-        //double beta_psi1 = params(2);
-        double c_phi1    = params(1);
-        double psi1_sqrt = sqrt(v + 1);//sqrt_fpsi(v, a_psi1, beta_psi1); // alpha_psi1=0.5
-        double phi1      = fphi(h/psi1_sqrt, c_phi1); // gamma_phi1=0.5
-        
-        return sigmasq / (psi1_sqrt * psi1_sqrt) * phi1;
-      } else {
-        // 1 variable no time = exp covariance
-        double sigmasq   = params(0);
-        double phi       = params(1);
-        return sigmasq * fphi(h, phi); 
-      }
-      
-    }
-  }
-  
-}
-
-void xCovHUV_inplace(arma::mat& res,
-                     const arma::mat& coords, const arma::uvec& ind1, const arma::uvec& ind2, 
-                     const arma::vec& cparams, const arma::mat& Dmat, bool same){
-  int d = coords.n_cols;
-  int p = Dmat.n_cols;
-  if((d == 2) & (p < 2)){
-    res = cexpcov(coords.rows(ind1), coords.rows(ind2), cparams(0), cparams(1), same);
-  } else {
-    if(same){
-      for(int i=0; i<ind1.n_elem; i++){
-        arma::rowvec cri = coords.row(ind1(i));
-        for(int j=i; j<ind2.n_elem; j++){
-          arma::rowvec delta = cri - coords.row(ind2(j));
-          double h = arma::norm(delta.subvec(0, 1));
-          double u = d > 2? abs(delta(2)) : 0;
-          if(p > 1){
-            for(int r=0; r<p; r++){
-              for(int s=0; s<p; s++){
-                double v = Dmat(r,s);
-                int rix = i*p + r;
-                int cix = j*p + s;
-                //printf("i: %d, j: %d, r: %d, s: %d", i, j, r, s);
-                res(rix, cix) = xCovHUV_base(h, u, v, cparams, p, d);
-              }
-            }
-          } else {
-            res(i, j) = xCovHUV_base(h, u, 0, cparams, p, d);
-          }
-        }
-      }
-      res = arma::symmatu(res);
-    } else {
-      //int cc = 0;
-      for(int i=0; i<ind1.n_elem; i++){
-        arma::rowvec cri = coords.row(ind1(i));
-        for(int j=0; j<ind2.n_elem; j++){
-          arma::rowvec delta = cri - coords.row(ind2(j));
-          double h = arma::norm(delta.subvec(0, 1));
-          double u = d > 2? abs(delta(2)) : 0;
-          if(p > 1){
-            for(int r=0; r<p; r++){
-              for(int s=0; s<p; s++){
-                double v = Dmat(r,s);
-                int rix = i*p + r;
-                int cix = j*p + s;
-                //printf("i: %d, j: %d, r: %d, s: %d", i, j, r, s);
-                res(rix, cix) = xCovHUV_base(h, u, v, cparams, p, d);
-              }
-            }
-          } else {
-            res(i, j) = xCovHUV_base(h, u, 0, cparams, p, d);
-          }
-        }
-      }
-      //return res;
-    }
-  }
-}
-
-arma::mat xCovHUV(const arma::mat& coords, const arma::uvec& ind1, const arma::uvec& ind2, 
-                  const arma::vec& cparams, const arma::mat& Dmat, bool same){
-  
-  int q = Dmat.n_cols;
-  int n1 = ind1.n_elem;
-  int n2 = ind2.n_elem;
-  arma::mat res = arma::zeros(n1 * q, n2 * q);
-  xCovHUV_inplace(res, coords, ind1, ind2, cparams, Dmat, same);
-  return res;
-}
-
-
-
 double C_base(const double& h, const double& u, const double& v, const arma::vec& params, const int& q, const int& dim){
   if(dim < 3){
     // no time, only space
@@ -251,17 +112,15 @@ double C_base(const double& h, const double& u, const double& v, const arma::vec
 }
 
 
-
 void mvCovAG20107_inplace(arma::mat& res,
                           const arma::mat& coords, 
                           const arma::uvec& qv_block,
                           const arma::uvec& ind1, const arma::uvec& ind2, 
-                          const arma::vec& ai1, const arma::vec& ai2, const arma::vec& phi_i, const arma::vec& thetamv, 
-                          const arma::mat& Dmat, bool same){
+                          const CovarianceParams& covpars, bool same){
   int d = coords.n_cols;
-  int p = Dmat.n_cols;
+  int p = covpars.Dmat.n_cols;
   if((d == 2) & (p < 2)){
-    res = cexpcov(coords.rows(ind1), coords.rows(ind2), ai1(0), thetamv(0), same);
+    res = cexpcov(coords.rows(ind1), coords.rows(ind2), covpars.ai1(0), covpars.thetamv(0), same);
   } else {
     int v_ix_i;
     int v_ix_j;
@@ -270,16 +129,16 @@ void mvCovAG20107_inplace(arma::mat& res,
     double v;
     arma::rowvec delta = arma::zeros<arma::rowvec>(d);
     
-    // ai1 params: cparams.subvec(0, p-1);
-    // ai2 params: cparams.subvec(p, 2*p-1);
-    // phi_i params: cparams.subvec(2*p, 3*p-1);
+    // covpars.ai1 params: cparams.subvec(0, p-1);
+    // covpars.ai2 params: cparams.subvec(p, 2*p-1);
+    // covpars.phi_i params: cparams.subvec(2*p, 3*p-1);
     // C_base params: cparams.subvec(3*p, 3*p + k - 1); // k = q>2? 3 : 1;
     
     if(same){
       for(int i=0; i<ind1.n_elem; i++){
         v_ix_i = qv_block(ind1(i));
-        double ai1_sq = ai1(v_ix_i) * ai1(v_ix_i);
-        double ai2_sq = ai2(v_ix_i) * ai2(v_ix_i);
+        double ai1_sq = covpars.ai1(v_ix_i) * covpars.ai1(v_ix_i);
+        double ai2_sq = covpars.ai2(v_ix_i) * covpars.ai2(v_ix_i);
         arma::rowvec cxi = coords.row(ind1(i));
         
         for(int j=i; j<ind2.n_elem; j++){
@@ -288,13 +147,13 @@ void mvCovAG20107_inplace(arma::mat& res,
           u = d < 3? 0 : abs(delta(2));
           
           v_ix_j = qv_block(ind2(j));
-          v = Dmat(v_ix_i, v_ix_j);
+          v = covpars.Dmat(v_ix_i, v_ix_j);
           
           if(v == 0){ // v_ix_i == v_ix_j
-            res(i, j) = ai1_sq * C_base(h, u, 0, thetamv, p, d) + 
-              ai2_sq * fphi(h, phi_i(v_ix_i));
+            res(i, j) = ai1_sq * C_base(h, u, 0, covpars.thetamv, p, d) + 
+              ai2_sq * fphi(h, covpars.phi_i(v_ix_i));
           } else {
-            res(i, j) =  ai1(v_ix_i) * ai1(v_ix_j) * C_base(h, u, v, thetamv, p, d);
+            res(i, j) =  covpars.ai1(v_ix_i) * covpars.ai1(v_ix_j) * C_base(h, u, v, covpars.thetamv, p, d);
           }
         }
       }
@@ -302,8 +161,8 @@ void mvCovAG20107_inplace(arma::mat& res,
     } else {
       for(int i=0; i<ind1.n_elem; i++){
         v_ix_i = qv_block(ind1(i));
-        double ai1_sq = ai1(v_ix_i) * ai1(v_ix_i);
-        double ai2_sq = ai2(v_ix_i) * ai2(v_ix_i);
+        double ai1_sq = covpars.ai1(v_ix_i) * covpars.ai1(v_ix_i);
+        double ai2_sq = covpars.ai2(v_ix_i) * covpars.ai2(v_ix_i);
         arma::rowvec cxi = coords.row(ind1(i));
         
         for(int j=0; j<ind2.n_elem; j++){
@@ -312,13 +171,13 @@ void mvCovAG20107_inplace(arma::mat& res,
           u = d < 3? 0 : abs(delta(2));
           
           v_ix_j = qv_block(ind2(j));
-          v = Dmat(v_ix_i, v_ix_j);
+          v = covpars.Dmat(v_ix_i, v_ix_j);
           
           if(v == 0){ // v_ix_i == v_ix_j
-            res(i, j) = ai1_sq * C_base(h, u, 0, thetamv, p, d) + 
-              ai2_sq * fphi(h, phi_i(v_ix_i));
+            res(i, j) = ai1_sq * C_base(h, u, 0, covpars.thetamv, p, d) + 
+              ai2_sq * fphi(h, covpars.phi_i(v_ix_i));
           } else {
-            res(i, j) =  ai1(v_ix_i) * ai1(v_ix_j) * C_base(h, u, v, thetamv, p, d);
+            res(i, j) =  covpars.ai1(v_ix_i) * covpars.ai1(v_ix_j) * C_base(h, u, v, covpars.thetamv, p, d);
           }
         }
       }
@@ -329,22 +188,20 @@ void mvCovAG20107_inplace(arma::mat& res,
 
 arma::mat mvCovAG20107(const arma::mat& coords, const arma::uvec& qv_block, 
                        const arma::uvec& ind1, const arma::uvec& ind2, 
-                       const arma::vec& ai1, const arma::vec& ai2, const arma::vec& phi_i, const arma::vec& thetamv, 
-                       const arma::mat& Dmat, bool same){
+                       const CovarianceParams& covpars, bool same){
   
   int n1 = ind1.n_elem;
   int n2 = ind2.n_elem;
   arma::mat res = arma::zeros(n1, n2);
   mvCovAG20107_inplace(res, coords, qv_block, ind1, ind2, 
-                       ai1, ai2, phi_i, thetamv, 
-                       Dmat, same);
+                       covpars, same);
   return res;
 }
 
 
 // for predictions
 
-arma::mat mvCovAG20107_cx(const arma::mat& coords1,
+arma::mat mvCovAG20107x(const arma::mat& coords1,
                           const arma::uvec& qv_block1,
                           const arma::mat& coords2,
                           const arma::uvec& qv_block2,
@@ -357,7 +214,7 @@ arma::mat mvCovAG20107_cx(const arma::mat& coords1,
   int d = coords1.n_cols;
   int p = Dmat.n_cols;
   if((d == 2) & (p < 2)){
-    res = cexpcov(coords1, coords2, thetamv(0), thetamv(1), false);
+    res = cexpcov(coords1, coords2, ai1(0), thetamv(0), false);
   } else {
     int v_ix_i;
     int v_ix_j;
@@ -365,9 +222,9 @@ arma::mat mvCovAG20107_cx(const arma::mat& coords1,
     double u;
     double v;
     arma::rowvec delta = arma::zeros<arma::rowvec>(d);
-    // ai1 params: cparams.subvec(0, p-1);
-    // ai2 params: cparams.subvec(p, 2*p-1);
-    // phi_i params: cparams.subvec(2*p, 3*p-1);
+    // covpars.ai1 params: cparams.subvec(0, p-1);
+    // covpars.ai2 params: cparams.subvec(p, 2*p-1);
+    // covpars.phi_i params: cparams.subvec(2*p, 3*p-1);
     // C_base params: cparams.subvec(3*p, 3*p + k - 1); // k = q>2? 3 : 1;
     for(int i=0; i<coords1.n_rows; i++){
       v_ix_i = qv_block1(i);
@@ -393,5 +250,81 @@ arma::mat mvCovAG20107_cx(const arma::mat& coords1,
     }
     return res;
   }
+}
+
+
+void NonspatialUnivariate_inplace(arma::mat& res,
+                                  const arma::mat& coords, const arma::uvec& ind1, const arma::uvec& ind2, 
+                                  const CovarianceParams& covpars, bool same){
+  int d = coords.n_cols;
+  if(same){
+    for(int i=0; i<ind1.n_elem; i++){
+      arma::rowvec cri = coords.row(ind1(i));
+      for(int j=i; j<ind2.n_elem; j++){
+        arma::rowvec deltasq = cri - coords.row(ind2(j));
+        double weighted = (arma::accu(covpars.kweights.t() % deltasq % deltasq));
+        res(i, j) = covpars.sigmasq * exp(-weighted) + (weighted == 0? 1e-3 : 0);
+      }
+    }
+    res = arma::symmatu(res);
+  } else {
+    //int cc = 0;
+    for(int i=0; i<ind1.n_elem; i++){
+      arma::rowvec cri = coords.row(ind1(i));
+      for(int j=0; j<ind2.n_elem; j++){
+        arma::rowvec deltasq = cri - coords.row(ind2(j));
+        double weighted = (arma::accu(covpars.kweights.t() % deltasq % deltasq));
+        res(i, j) = covpars.sigmasq * exp(-weighted) + (weighted == 0? 1e-3 : 0);
+      }
+    }
+  }
+  
+}
+
+arma::mat NonspatialUnivariate(const arma::mat& coords, const arma::uvec& ind1, const arma::uvec& ind2, 
+                               const CovarianceParams& covpars, bool same){
+  int n1 = ind1.n_elem;
+  int n2 = ind2.n_elem;
+  arma::mat res = arma::zeros(n1, n2);
+  NonspatialUnivariate_inplace(res, coords, ind1, ind2, covpars, same);
+  return res;
+}
+
+
+
+void Covariancef_inplace(arma::mat& res,
+                      const arma::mat& coords, const arma::uvec& qv_block, 
+                      const arma::uvec& ind1, const arma::uvec& ind2, 
+                      const CovarianceParams& covpars, bool same){
+
+  if(covpars.covariance_model == 0){
+    mvCovAG20107_inplace(res, coords, qv_block, ind1, ind2, 
+                         covpars, same);
+  }
+  if(covpars.covariance_model == 1){
+    NonspatialUnivariate_inplace(res, coords, ind1, ind2, covpars, same);
+  }
+}
+
+
+
+arma::mat Covariancef(const arma::mat& coords, const arma::uvec& qv_block, 
+                      const arma::uvec& ind1, const arma::uvec& ind2, 
+                      const CovarianceParams& covpars, bool same){
+  int n1 = ind1.n_elem;
+  int n2 = ind2.n_elem;
+  arma::mat res = arma::zeros(n1, n2);
+  if(covpars.covariance_model < 0){
+    Rcpp::Rcout << "Covariance model not implemented " << endl;
+    throw 1;
+  }
+  if(covpars.covariance_model == 0){
+    mvCovAG20107_inplace(res, coords, qv_block, ind1, ind2, 
+                         covpars, same);
+  }
+  if(covpars.covariance_model == 1){
+    NonspatialUnivariate_inplace(res, coords, ind1, ind2, covpars, same);
+  }
+  return res;
 }
 

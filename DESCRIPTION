@@ -1,6 +1,6 @@
 Package: spamtree
 Type: Package
-Title: Bayesian Spatial Multiscale Trees for spatial linear regression
+Title: Bayesian Spatial Multivariate Trees for spatial linear regression
 Version: 0.1
 Date: 2020-04-01
 Author: M. Peruzzi
@@ -8,5 +8,5 @@ Maintainer: M. Peruzzi <mklnsrc@gmail.com>
 Description: Methods for fitting Bayesian Spatial Multiscale Trees for large spatial data. 
 License: CC BY 4.0
 Imports: Rcpp (>= 1.0.3), FNN, dplyr, tidyr, magrittr, Matrix
-LinkingTo: Rcpp, RcppArmadillo, RcppEigen
+LinkingTo: Rcpp, RcppArmadillo
 RoxygenNote: 7.1.0

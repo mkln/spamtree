@@ -1,4 +1,4 @@
 useDynLib(spamtree, .registration=TRUE)
 importFrom(Rcpp, evalCpp)
 
-export("prebuild", "prebuild_mv", "precision_matrix", "prior_sample", "spamtree", "spamtree_mv", "mvCovAG20107")
+export("prebuild", "spamtree", "mvCovAG20107x")

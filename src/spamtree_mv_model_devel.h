@@ -8,11 +8,10 @@
 #include "field_v_concatm.h"
 #include "covariance_functions.h"
 #include "multires_utils.h"
-#include "irls.h"
 
 // with indexing
 // without block extensions (obs with NA are left in)
- 
+
 using namespace std;
 
 const double hl2pi = -.5 * log(2 * M_PI);
@@ -61,7 +60,6 @@ struct SpamTreeMVDataDevel {
   // added
   double ll_y_all;
   arma::field<arma::vec> Ddiag;
-  
 };
 
 class SpamTreeMVdevel {
@@ -104,6 +102,7 @@ public:
   
   // indexing info
   arma::field<arma::uvec> indexing; 
+  arma::field<arma::uvec> indexing_obs;
   arma::field<arma::uvec> parents_indexing; 
   arma::field<arma::uvec> children_indexing;
   
@@ -146,6 +145,22 @@ public:
   arma::field<arma::vec> dim_by_parent;
   //arma::field<arma::vec> dim_by_child;
   
+  // caching ~ by level
+  arma::field<arma::uvec> cc_caching; // cc block with itself
+  arma::field<arma::uvec> cc_caching_uniques;
+  arma::field<arma::uvec> cx_caching; // cx block with parent
+  arma::field<arma::uvec> cx_caching_uniques;
+  arma::field<arma::uvec> xxi_caching; // xx block
+  arma::field<arma::uvec> xxi_caching_uniques;
+  arma::field<arma::uvec> cr_caching; // cc - cx xx cx
+  arma::field<arma::uvec> cr_caching_uniques;
+  
+  // caching utils
+  arma::umat rotgroup; // output from block_rotation_group
+  arma::field<arma::umat> parents_indexing_rotated; // output from parents_indexing_order
+  arma::field<arma::umat> indexing_rotated; // output from indexing_order
+  arma::field<arma::umat> indexing_obs_rotated;
+  
   // params
   arma::vec bigrnorm;
   arma::vec w;
@@ -153,7 +168,7 @@ public:
   arma::vec XB;
   arma::vec tausq_inv; // tausq for the l=q variables
   arma::vec tausq_inv_long; // storing tausq_inv at all locations
-
+  
   // params with mh step
   SpamTreeMVDataDevel param_data; 
   SpamTreeMVDataDevel alter_data;
@@ -173,6 +188,27 @@ public:
   void init_indexing();
   void init_finalize();
   void init_model_data(const arma::vec&);
+  
+  CovarianceParams covpars;
+  
+  // caching related
+  void init_caching();
+  arma::field<arma::uvec> cacher(const arma::field<arma::mat>&);
+  //void refresh_cache(SpamTreeMVDataDevel&);
+  //arma::field<arma::umat> Kxx_inv_perms;
+  //arma::field<arma::umat> Kxx_invchol_perms;
+  //arma::field<arma::umat> Rcc_invchol_perms;
+  //arma::field<arma::umat> Kxc_perms;
+  //arma::field<arma::umat> Kcc_perms;
+  //arma::field<arma::umat> w_cond_mean_K_perms;
+  //arma::field<arma::umat> w_cond_prec_perms;
+  arma::field<arma::field<arma::uvec> >store_find_lastpar_main;
+  arma::field<arma::field<arma::uvec> >store_find_lastpar_on_cache;
+  arma::field<arma::field<arma::uvec> >store_find_u;
+  arma::field<arma::field<arma::uvec> >store_found_cx;
+  arma::field<arma::field<arma::uvec> >store_found_cc;
+  // -- end caching --
+  
   
   //arma::uvec converged;
   std::string family;
@@ -197,6 +233,7 @@ public:
   
   bool get_loglik_comps_w(SpamTreeMVDataDevel& data);
   bool get_loglik_comps_w_std(SpamTreeMVDataDevel& data);
+  bool get_loglik_comps_w_std_nocache(SpamTreeMVDataDevel& data);
   
   
   void deal_with_w(bool);
@@ -251,6 +288,7 @@ public:
     const arma::vec& block_group_in,
     
     const arma::field<arma::uvec>& indexing_in,
+    const arma::field<arma::uvec>& indexing_obs_in,
     
     const arma::mat& w_in,
     const arma::vec& beta_in,
