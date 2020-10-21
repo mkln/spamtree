@@ -275,8 +275,6 @@ Rcpp::List spamtree_mv_mcmc(
           //invgamma_logdens(mtree.param_data.theta(0), 2, 2) +
           jacobian;
         
-        Rcpp::Rcout << new_loglik << " " << current_loglik << " " << jacobian << endl;
-        
         if(isnan(logaccept)){
           Rcpp::Rcout << new_param.t() << endl;
           Rcpp::Rcout << param.t() << endl;
