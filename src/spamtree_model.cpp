@@ -946,13 +946,15 @@ bool SpamTreeMV::get_loglik_comps_w_std(SpamTreeMVData& data){
   }
   
   if(errtype > 0){
-    Rcpp::Rcout << "Cholesky failed at some point. Here's the value of theta that caused this" << endl;
-    Rcpp::Rcout << "ai1: " << covpars.ai1.t() << endl
-                << "ai2: " << covpars.ai2.t() << endl
-                << "phi_i: " << covpars.phi_i.t() << endl
-                << "thetamv: " << covpars.thetamv.t() << endl
-                << "and Dmat: " << covpars.Dmat << endl;
-    Rcpp::Rcout << " -- auto rejected and proceeding." << endl;
+    if(verbose){
+      Rcpp::Rcout << "Cholesky failed at some point. Here's the value of theta that caused this" << endl;
+      Rcpp::Rcout << "ai1: " << covpars.ai1.t() << endl
+                  << "ai2: " << covpars.ai2.t() << endl
+                  << "phi_i: " << covpars.phi_i.t() << endl
+                  << "thetamv: " << covpars.thetamv.t() << endl
+                  << "and Dmat: " << covpars.Dmat << endl;
+      Rcpp::Rcout << " -- auto rejected and proceeding." << endl;
+    }
     return false;
   }
   

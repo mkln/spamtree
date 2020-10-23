@@ -390,10 +390,6 @@ Rcpp::List spamtree_mv_mcmc(
     
       if((m>0) & (mcmc > 100)){
         if(!(m % (mcmc / 10))){
-          //Rcpp::Rcout << paramsd << endl;
-          //accept_count_local = 0;
-          //propos_count_local = 0;
-          
           interrupted = checkInterrupt();
           if(interrupted){
             throw 1;
