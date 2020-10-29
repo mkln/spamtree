@@ -180,7 +180,8 @@ make_tree_old <- function(coords, na_which, sort_mv_id,
     
     # now manage leftouts
     if(nrow(cx) > 0){
-      ## missing locations = predictions: assign them to same block as their nearest-neighbor.
+      
+      
       column_select <- colnames(cx)[grepl("Var", colnames(cx))]
       cx_leftover <- cx[,c(column_select, "ix", "sort_mv_id")]
       max_res <- coords_refset$res %>% max()
@@ -278,19 +279,25 @@ make_tree_old <- function(coords, na_which, sort_mv_id,
       ## missing locations = predictions: assign them to same block as their nearest-neighbor.
       column_select <- colnames(cx)[grepl("Var", colnames(coords_missing))]
       cx_missing <- coords_missing[,c(column_select, "ix", "sort_mv_id")]
-      coords_refset_sub <- coords_refset %>% filter(res %in% c(max(res)))
+      coords_refset_sub <- coords_refset #%>% filter(res %in% c(max(res)))
       
       #target_coords <- coords_refset_sub %>% select(contains("Var"))
       #nn_of_missing <- FNN::get.knnx(target_coords, cx_missing, k=1, algorithm="kd_tree")
       #block_of_missing <- coords_refset_sub[nn_of_missing$nn.index, "block"]
       
+      # if there are leftovers then look resolution before those.
+      max_res <- coords_all$res %>% max()
+      res_of_missing <- max_res + 1 
+      
+      blockname = sprintf("block_res%02d", res_of_missing)
+      
       ## CHERRY PICKING
       
       missing_vars <- cx_missing$sort_mv_id %>% unique()
-      cx_missing %<>% mutate(block=NA)
+      cx_missing %<>% mutate(block=NA, parent_res=NA)
       
       if(!cherrypick_same_margin){
-        for(vv in missing_vars){
+        #for(vv in missing_vars){
           #row_of_this <- which(cx_missing$sort_mv_id == vv)
           
           target_coords_same_margin <- coords_refset_sub %>% 
@@ -304,17 +311,18 @@ make_tree_old <- function(coords, na_which, sort_mv_id,
                                                      cx_missing_same_margin[,1:dd], k=1, algorithm="kd_tree")
           
           block_of_missing_same_margin <- target_coords_same_margin[nn_of_missing_same_margin$nn.index, "block"]
+          parentres_of_missing_same_margin <- target_coords_same_margin[nn_of_missing_same_margin$nn.index, "res"]
           
-          cx_missing[#row_of_this, 
-                     "block"] <- block_of_missing_same_margin
-        }
+          cx_missing[,"block"] <- block_of_missing_same_margin
+          cx_missing[,"parent_res"] <- parentres_of_missing_same_margin
+        #}
       } else {
         for(vv in missing_vars){
           row_of_this <- which(cx_missing$sort_mv_id == vv)
           
           target_coords_same_margin <- coords_refset_sub %>% 
             filter(sort_mv_id == vv) %>% 
-            dplyr::select(contains("Var"), ix, block)
+            dplyr::select(contains("Var"), ix, block, res)
           
           cx_missing_same_margin <- cx_missing %>%
             filter(sort_mv_id == vv)
@@ -323,43 +331,45 @@ make_tree_old <- function(coords, na_which, sort_mv_id,
                                                      cx_missing_same_margin[,1:dd], k=1, algorithm="kd_tree")
           
           block_of_missing_same_margin <- target_coords_same_margin[nn_of_missing_same_margin$nn.index, "block"]
+          parentres_of_missing_same_margin <- target_coords_same_margin[nn_of_missing_same_margin$nn.index, "res"]
           
           cx_missing[row_of_this, "block"] <- block_of_missing_same_margin
+          cx_missing[row_of_this, "parent_res"] <- parentres_of_missing_same_margin
         }
       }
       
-      
       block_of_missing <- cx_missing$block
+      parentres_of_missing <- cx_missing$parent_res
       
-      # if there are leftovers then look resolution before those.
-      max_res <- coords_all$res %>% max()
-      res_of_missing <- max_res + 1 
+      #parent_blockname = sprintf("block_res%02d", res_of_missing - 1 - 1*(nrow(cx)>0))
       
-      blockname = sprintf("block_res%02d", res_of_missing)
-      parent_blockname = sprintf("block_res%02d", res_of_missing - 1 - 1*(nrow(cx)>0))
       
       coords_res_miss <- coords_missing %>% 
         as.data.frame() %>%
         mutate(parent_block = block_of_missing,
                block = as.numeric(factor(block_of_missing)) + max_block_number,
-               res = res_of_missing)
+               res = res_of_missing,
+               parent_res = parentres_of_missing)
       
       coords_all <- bind_rows(coords_all, coords_res_miss %>% #mutate(part=NA) %>% 
-                                dplyr::select(-parent_block))
+                                dplyr::select(-parent_block, -parent_res))
       
       # keep track of overall tessellation
       suppressMessages({
-        coords_allres %<>% left_join(coords_res_miss %>% dplyr::select(-res) %>% rename(!!sym(blockname) := block))
+        coords_allres %<>% left_join(coords_res_miss %>% dplyr::select(-res, -parent_block, -parent_res) %>% rename(!!sym(blockname) := block))
       })
       
-      parchi_of_missing <- coords_res_miss %>% 
-        rename(!!sym(parent_blockname) := parent_block, !!sym(blockname) := block) %>% 
-        dplyr::select(contains("block_res")) %>% 
-        unique() 
-      
-      suppressMessages({
-        parchi_map %<>% left_join(parchi_of_missing)
-      })
+      for(jres in unique(coords_res_miss$parent_res)){
+        parent_blockname = sprintf("block_res%02d", jres)
+        
+        parchi_of_missing <- coords_res_miss %>% filter(parent_res == jres) %>% 
+          rename(!!sym(parent_blockname) := parent_block, !!sym(blockname) := block) %>% 
+          dplyr::select(contains("block_res")) %>% 
+          unique() 
+        suppressMessages({
+          parchi_map %<>% left_join(parchi_of_missing)
+        })
+      }
       
       res_is_ref <- c(res_is_ref, 0)
     }
@@ -651,7 +661,16 @@ make_tree <- function(coords, na_which, sort_mv_id,
       coords_all <- coords_refset
     }
     
+    print(res_is_ref)
+    if(length(res_is_ref) == 1){
+      res_is_ref <- 1
+    }
+    
     # now manage missing
+    # if there are leftovers then look resolution before those.
+    max_res <- coords_all$res %>% max()
+    res_of_missing <- max_res + 1 
+    blockname = sprintf("block_res%02d", res_of_missing)
     
     if(nrow(coords_missing) > 0){
       max_block_number <- coords_all %>% pull(block) %>% max()
@@ -667,7 +686,7 @@ make_tree <- function(coords, na_which, sort_mv_id,
       ## CHERRY PICKING
       
       missing_vars <- cx_missing$sort_mv_id %>% unique()
-      cx_missing %<>% mutate(block=NA)
+      cx_missing %<>% mutate(block=NA, parent_res=NA)
       
       if(!cherrypick_same_margin){
         for(vv in missing_vars){
@@ -676,7 +695,7 @@ make_tree <- function(coords, na_which, sort_mv_id,
           target_coords_same_margin <- coords_refset_sub %>% 
             #filter(sort_mv_id == vv) %>% 
             #dplyr::filter(res == max(res)) %>%
-            dplyr::select(contains("Var"), ix, block)
+            dplyr::select(contains("Var"), ix, block, res)
           
           cx_missing_same_margin <- cx_missing# %>%
           #filter(sort_mv_id == vv)
@@ -686,8 +705,11 @@ make_tree <- function(coords, na_which, sort_mv_id,
           
           block_of_missing_same_margin <- target_coords_same_margin[nn_of_missing_same_margin$nn.index, "block"]
           
-          cx_missing[#row_of_this, 
-            "block"] <- block_of_missing_same_margin
+          parentres_of_missing_same_margin <- target_coords_same_margin[nn_of_missing_same_margin$nn.index, "res"]
+          
+          cx_missing[,"block"] <- block_of_missing_same_margin
+          cx_missing[,"parent_res"] <- parentres_of_missing_same_margin
+          
         }
       } else {
         for(vv in missing_vars){
@@ -695,7 +717,7 @@ make_tree <- function(coords, na_which, sort_mv_id,
           
           target_coords_same_margin <- coords_refset_sub %>% 
             dplyr::filter(sort_mv_id == vv) %>%
-            dplyr::select(contains("Var"), ix, block)
+            dplyr::select(contains("Var"), ix, block, res)
           
           cx_missing_same_margin <- cx_missing %>%
             dplyr::filter(sort_mv_id == vv)
@@ -704,43 +726,43 @@ make_tree <- function(coords, na_which, sort_mv_id,
                                                      cx_missing_same_margin[,1:dd], k=1, algorithm="kd_tree")
           
           block_of_missing_same_margin <- target_coords_same_margin[nn_of_missing_same_margin$nn.index, "block"]
+          parentres_of_missing_same_margin <- target_coords_same_margin[nn_of_missing_same_margin$nn.index, "res"]
           
           cx_missing[row_of_this, "block"] <- block_of_missing_same_margin
+          cx_missing[row_of_this, "parent_res"] <- parentres_of_missing_same_margin
+          
         }
       }
       
-      
       block_of_missing <- cx_missing$block
-      
-      # if there are leftovers then look resolution before those.
-      max_res <- coords_all$res %>% max()
-      res_of_missing <- max_res + 1 
-      
-      blockname = sprintf("block_res%02d", res_of_missing)
-      parent_blockname = sprintf("block_res%02d", res_of_missing - 1 - 1*(nrow(cx)>0))
+      parentres_of_missing <- cx_missing$parent_res
       
       coords_res_miss <- coords_missing %>% 
         as.data.frame() %>%
         mutate(parent_block = block_of_missing,
                block = as.numeric(factor(block_of_missing)) + max_block_number,
-               res = res_of_missing)
+               res = res_of_missing,
+               parent_res = parentres_of_missing)
       
       coords_all <- bind_rows(coords_all, coords_res_miss %>% #mutate(part=NA) %>% 
-                                dplyr::select(-parent_block))
+                                dplyr::select(-parent_block, -parent_res))
       
       # keep track of overall tessellation
       suppressMessages({
-        coords_allres %<>% left_join(coords_res_miss %>% dplyr::select(-res) %>% rename(!!sym(blockname) := block))
+        coords_allres %<>% left_join(coords_res_miss %>% dplyr::select(-res, -parent_block, -parent_res) %>% rename(!!sym(blockname) := block))
       })
       
-      parchi_of_missing <- coords_res_miss %>% 
-        rename(!!sym(parent_blockname) := parent_block, !!sym(blockname) := block) %>% 
-        dplyr::select(contains("block_res")) %>% 
-        unique() 
-      
-      suppressMessages({
-        parchi_map %<>% left_join(parchi_of_missing)
-      })
+      for(jres in unique(coords_res_miss$parent_res)){
+        parent_blockname = sprintf("block_res%02d", jres)
+        
+        parchi_of_missing <- coords_res_miss %>% filter(parent_res == jres) %>% 
+          rename(!!sym(parent_blockname) := parent_block, !!sym(blockname) := block) %>% 
+          dplyr::select(contains("block_res")) %>% 
+          unique() 
+        suppressMessages({
+          parchi_map %<>% left_join(parchi_of_missing)
+        })
+      }
       
       res_is_ref <- c(res_is_ref, 0)
     }

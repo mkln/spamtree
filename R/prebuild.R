@@ -39,7 +39,7 @@ prebuild <- function(y, X, coords,
     last_not_reference <- F
     limited_tree <- F
     cherrypick_same_margin <- T
-    cherrypick_group_locations <- T
+    cherrypick_group_locations <- F
     mvbias <- 0
     mcmc        = list(keep=1000, burn=0, thin=1);
     num_threads = 4;
@@ -377,6 +377,7 @@ Building...")
     sample_predicts=sample_predicts,
     family=family,
     coords_blocking=coords_blocking,
+    data=simdata,
     sort_mv_id=sort_mv_id,
     sort_ix=sort_ix))
   

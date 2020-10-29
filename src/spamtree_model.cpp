@@ -832,7 +832,7 @@ bool SpamTreeMV::get_loglik_comps_w_std(SpamTreeMVData& data){
         } catch(...){
           errtype = 1;
         }
-        
+        data.has_updated(u) = 1;
         
       } else {
         //Rcpp::Rcout << "step 2\n";
@@ -983,6 +983,8 @@ void SpamTreeMV::gibbs_sample_w_std(bool need_update){
     #pragma omp parallel for
     for(int i=0; i<u_by_block_groups(g).n_elem; i++){
       int u = u_by_block_groups(g)(i);
+      
+      //Rcpp::Rcout << "u: " << u << " g: " << g << endl;
       //arma::mat Dtaui = arma::diagmat(tausq_inv_long.rows(indexing(u)));
       //arma::sp_mat Ztausq = spmat_by_diagmat(Zblock(u).t(), tausq_inv_long.rows(indexing(u)));
       
@@ -1223,7 +1225,7 @@ void SpamTreeMV::predict_std(bool sampling=true, bool theta_update=true){
       int u_par = parents(u)(parents(u).n_elem - 1);
       //start = std::chrono::steady_clock::now();
       // updating the parent
-      if(param_data.has_updated(u) == 0){
+      if(param_data.has_updated(u_par) == 0){
         if(limited_tree){
           
           arma::mat Kxx = Covariancef(coords, qvblock_c, indexing(u_par), indexing(u_par), covpars, true);
