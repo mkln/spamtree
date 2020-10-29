@@ -25,6 +25,14 @@ list_qtile <- function(x, q) {
     .Call(`_spamtree_list_qtile`, x, q)
 }
 
+par_huvtransf_fwd <- function(par, set_unif_bounds) {
+    .Call(`_spamtree_par_huvtransf_fwd`, par, set_unif_bounds)
+}
+
+par_huvtransf_back <- function(par, set_unif_bounds) {
+    .Call(`_spamtree_par_huvtransf_back`, par, set_unif_bounds)
+}
+
 kthresholds <- function(x, k) {
     .Call(`_spamtree_kthresholds`, x, k)
 }

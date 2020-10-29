@@ -84,6 +84,30 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// par_huvtransf_fwd
+arma::vec par_huvtransf_fwd(arma::vec par, const arma::mat& set_unif_bounds);
+RcppExport SEXP _spamtree_par_huvtransf_fwd(SEXP parSEXP, SEXP set_unif_boundsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::vec >::type par(parSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type set_unif_bounds(set_unif_boundsSEXP);
+    rcpp_result_gen = Rcpp::wrap(par_huvtransf_fwd(par, set_unif_bounds));
+    return rcpp_result_gen;
+END_RCPP
+}
+// par_huvtransf_back
+arma::vec par_huvtransf_back(arma::vec par, const arma::mat& set_unif_bounds);
+RcppExport SEXP _spamtree_par_huvtransf_back(SEXP parSEXP, SEXP set_unif_boundsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::vec >::type par(parSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type set_unif_bounds(set_unif_boundsSEXP);
+    rcpp_result_gen = Rcpp::wrap(par_huvtransf_back(par, set_unif_bounds));
+    return rcpp_result_gen;
+END_RCPP
+}
 // kthresholds
 arma::vec kthresholds(arma::vec x, int k);
 RcppExport SEXP _spamtree_kthresholds(SEXP xSEXP, SEXP kSEXP) {
@@ -255,6 +279,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"_spamtree_list_mean", (DL_FUNC) &_spamtree_list_mean, 1},
     {"_spamtree_list_cubes_mean", (DL_FUNC) &_spamtree_list_cubes_mean, 2},
     {"_spamtree_list_qtile", (DL_FUNC) &_spamtree_list_qtile, 2},
+    {"_spamtree_par_huvtransf_fwd", (DL_FUNC) &_spamtree_par_huvtransf_fwd, 2},
+    {"_spamtree_par_huvtransf_back", (DL_FUNC) &_spamtree_par_huvtransf_back, 2},
     {"_spamtree_kthresholds", (DL_FUNC) &_spamtree_kthresholds, 2},
     {"_spamtree_col_to_string", (DL_FUNC) &_spamtree_col_to_string, 1},
     {"_spamtree_part_axis_parallel_lmt", (DL_FUNC) &_spamtree_part_axis_parallel_lmt, 2},

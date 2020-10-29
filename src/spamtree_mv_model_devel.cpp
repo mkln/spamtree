@@ -430,21 +430,8 @@ SpamTreeMVdevel::SpamTreeMVdevel(
   indexing_obs = indexing_obs_in;
   
   
-  covpars = CovarianceParams(dd, q);
-  /*
-   if(dd == 2){
-   if(q > 2){
-   npars = 1+3;
-   } else {
-   npars = 1+1;
-   }
-   } else {
-   if(q > 2){
-   npars = 1+5;
-   } else {
-   npars = 1+3; // sigmasq + alpha + beta + phi
-   }
-   }*/
+  covpars = CovarianceParams(dd, q, -1);
+
   
   if(dd == 2){
     int n_cbase = q > 2? 3: 1;
@@ -722,21 +709,22 @@ void SpamTreeMVdevel::init_model_data(const arma::vec& theta_in){
   message("[init_model_data]");
   // data for metropolis steps and predictions
   // block params
+  Rcpp::Rcout << "initializing param_data " << endl;
   
   param_data.has_updated   = arma::zeros<arma::uvec>(n_blocks);
   param_data.wcore         = arma::zeros(n_blocks);
   param_data.Kxc           = arma::field<arma::mat> (n_blocks);
-  param_data.Kxx_inv       = arma::field<arma::mat> (n_blocks);
+  //param_data.Kxx_inv       = arma::field<arma::mat> (n_blocks);
   param_data.w_cond_mean_K = arma::field<arma::mat> (n_blocks);
-  param_data.Kcc = arma::field<arma::mat>(n_blocks);
+  //param_data.Kcc = arma::field<arma::mat>(n_blocks);
   param_data.w_cond_prec   = arma::field<arma::mat> (n_blocks);
-  param_data.Kxx_invchol = arma::field<arma::mat> (n_blocks); // storing the inv choleskys of {parents(w), w} (which is parent for children(w))
+  //param_data.Kxx_invchol = arma::field<arma::mat> (n_blocks); // storing the inv choleskys of {parents(w), w} (which is parent for children(w))
   param_data.Rcc_invchol = arma::field<arma::mat> (n_blocks); 
   param_data.ccholprecdiag = arma::field<arma::vec> (n_blocks);
   
-  param_data.Sigi_chol = arma::field<arma::mat>(n_blocks);
-  param_data.AK_uP_all = arma::field<arma::mat> (n_blocks);
-  param_data.AK_uP_u_all = arma::field<arma::mat> (n_blocks);
+  //param_data.Sigi_chol = arma::field<arma::mat>(n_blocks);
+  //param_data.AK_uP_all = arma::field<arma::mat> (n_blocks);
+  //param_data.AK_uP_u_all = arma::field<arma::mat> (n_blocks);
   
   // loglik w for updating theta
   param_data.logdetCi_comps = arma::zeros(n_blocks);
@@ -750,6 +738,7 @@ void SpamTreeMVdevel::init_model_data(const arma::vec& theta_in){
   param_data.Sigi_children = arma::field<arma::cube> (n_blocks);
   param_data.Smu_children = arma::field<arma::mat> (n_blocks);
   
+  Rcpp::Rcout << "initializing param_data : blocks " << n_blocks << endl;
   for(int i=0; i<n_blocks; i++){
     int u = block_names(i)-1;
     
@@ -758,14 +747,14 @@ void SpamTreeMVdevel::init_model_data(const arma::vec& theta_in){
                                indexing(i).n_elem, children(i).n_elem);
       param_data.Smu_children(i) = arma::zeros(indexing(i).n_elem,
                               children(i).n_elem);
-      param_data.Kxx_invchol(u) = arma::zeros(parents_indexing(u).n_elem + indexing(u).n_elem, //Kxx_invchol(last_par).n_rows + Kcc.n_rows, 
-                             parents_indexing(u).n_elem + indexing(u).n_elem);//Kxx_invchol(last_par).n_cols + Kcc.n_cols);
+      //param_data.Kxx_invchol(u) = arma::zeros(parents_indexing(u).n_elem + indexing(u).n_elem, //Kxx_invchol(last_par).n_rows + Kcc.n_rows, 
+       //                      parents_indexing(u).n_elem + indexing(u).n_elem);//Kxx_invchol(last_par).n_cols + Kcc.n_cols);
       param_data.w_cond_prec(u) = arma::zeros(indexing(u).n_elem, indexing(u).n_elem);
       param_data.Rcc_invchol(u) = arma::zeros(indexing(u).n_elem, indexing(u).n_elem);
-      param_data.Sigi_chol(u) = arma::zeros(indexing(u).n_elem, indexing(u).n_elem);
+      //param_data.Sigi_chol(u) = arma::zeros(indexing(u).n_elem, indexing(u).n_elem);
       
       //if(block_ct_obs(u) > 0){
-      param_data.Kcc(u) = arma::zeros(indexing(u).n_elem, indexing(u).n_elem);
+      //param_data.Kcc(u) = arma::zeros(indexing(u).n_elem, indexing(u).n_elem);
       
     }
     param_data.w_cond_mean_K(u) = arma::zeros(indexing(u).n_elem, parents_indexing(u).n_elem);
@@ -774,14 +763,14 @@ void SpamTreeMVdevel::init_model_data(const arma::vec& theta_in){
     
     param_data.Ddiag(u) = arma::zeros(indexing_obs(u).n_elem);
     //}
-    param_data.AK_uP_all(u) = arma::zeros(parents_indexing(u).n_elem, indexing(u).n_elem);
-    param_data.AK_uP_u_all(u) = param_data.AK_uP_all(u) * param_data.w_cond_mean_K(u);
+    //param_data.AK_uP_all(u) = arma::zeros(parents_indexing(u).n_elem, indexing(u).n_elem);
+    //param_data.AK_uP_u_all(u) = param_data.AK_uP_all(u) * param_data.w_cond_mean_K(u);
   }
   
   alter_data                = param_data; 
   
   Rcpp::Rcout << "init_model_data: indexing elements: " << indexing.n_elem << endl;
-  
+  message("[init_model_data]");
 }
 
 arma::field<arma::uvec> SpamTreeMVdevel::cacher(const arma::field<arma::mat>& source_mats){
@@ -791,7 +780,7 @@ arma::field<arma::uvec> SpamTreeMVdevel::cacher(const arma::field<arma::mat>& so
     
     for(int i=0; i<u_by_block_groups(g).n_elem; i++){
       int u_target = u_by_block_groups(g)(i);
-      if(false & (g==n_actual_groups - 1)){
+      if(g==n_actual_groups - 1){
         targ_caching(g)(i) = u_target; // last level = observations = avoid caching
         // even though there may be some advantage with gridded obs...
       } else {
@@ -1389,12 +1378,12 @@ bool SpamTreeMVdevel::get_loglik_comps_w_std(SpamTreeMVDataDevel& data){
       if(parents(u).n_elem == 0){
         arma::vec w_x = w.rows(indexing(u));
         arma::mat Kcc = Covariancef(coords, qvblock_c, indexing(u), indexing(u), covpars, true);
-        data.Kcc(u) = Kcc;
+        //data.Kcc(u) = Kcc;
         try{
-          data.Kxx_invchol(u) = arma::inv(arma::trimatl(arma::chol(Kcc, "lower")));
-          data.Kxx_inv(u) = data.Kxx_invchol(u).t() * data.Kxx_invchol(u);
-          data.Rcc_invchol(u) = data.Kxx_invchol(u); 
-          data.w_cond_prec(u) = data.Kxx_inv(u);//Rcc_invchol(u).t() * Rcc_invchol(u);
+          arma::mat Kxx_invchol = arma::inv(arma::trimatl(arma::chol(Kcc, "lower")));
+          //data.Kxx_inv(u) = Kxx_invchol.t() * Kxx_invchol;
+          data.Rcc_invchol(u) = Kxx_invchol; 
+          data.w_cond_prec(u) = Kxx_invchol.t() * Kxx_invchol;
           data.wcore(u) = arma::conv_to<double>::from(w_x.t() * data.w_cond_prec(u) * w_x);
           data.ccholprecdiag(u) = data.Rcc_invchol(u).diag();
           data.logdetCi_comps(u) = arma::accu(log(data.ccholprecdiag(u)));
@@ -1640,8 +1629,10 @@ void SpamTreeMVdevel::gibbs_sample_w_std(bool need_update){
         // Sigi_p
         
         arma::mat Sigi_tot = param_data.w_cond_prec(u);
+        arma::mat AK_uP_all;
         if(parents(u).n_elem > 0){
-          param_data.AK_uP_all(u) = param_data.w_cond_mean_K(u).t() * param_data.w_cond_prec(u); 
+          //param_data.AK_uP_all(u) = 
+          AK_uP_all = param_data.w_cond_mean_K(u).t() * param_data.w_cond_prec(u); 
         }
         
         // this is a reference set therefore it must have children
@@ -1676,7 +1667,7 @@ void SpamTreeMVdevel::gibbs_sample_w_std(bool need_update){
         
         start = std::chrono::steady_clock::now();
         if(parents(u).n_elem>0){
-          Smu_tot += param_data.AK_uP_all(u).t() * w.rows(parents_indexing(u));//param_data.w_cond_mean(u);
+          Smu_tot += AK_uP_all.t() * w.rows(parents_indexing(u));//param_data.w_cond_mean(u);
           // for updating the parents that have this block as child
         }
         //end = std::chrono::steady_clock::now();
@@ -1688,17 +1679,17 @@ void SpamTreeMVdevel::gibbs_sample_w_std(bool need_update){
         Smu_tot += arma::sum(param_data.Smu_children(u), 1);
         //}
         
-        
+        arma::mat Sigi_chol;
         try {
-          param_data.Sigi_chol(u) = arma::inv(arma::trimatl(arma::chol( arma::symmatu( Sigi_tot ), "lower")));
+          Sigi_chol = arma::inv(arma::trimatl(arma::chol( arma::symmatu( Sigi_tot ), "lower")));
         } catch(...){
           errtype = 10;
+          Sigi_chol = arma::eye(arma::size(Sigi_tot));
         }
         //end = std::chrono::steady_clock::now();
         //timings(0) += std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
         
         //start = std::chrono::steady_clock::now();
-        arma::mat Sigi_chol = param_data.Sigi_chol(u);
         
         arma::vec rnvec = bigrnorm.rows(indexing(u));//arma::randn(indexing(u).n_elem);//arma::vectorise(rand_norm_mat.rows(indexing(u)));
         
@@ -1706,9 +1697,9 @@ void SpamTreeMVdevel::gibbs_sample_w_std(bool need_update){
         // message the parents
         if(parents(u).n_elem > 0){
           //start = std::chrono::steady_clock::now();
-          if(need_update){
-            param_data.AK_uP_u_all(u) = param_data.AK_uP_all(u) * param_data.w_cond_mean_K(u);
-          }
+          
+          arma::mat AK_uP_u_all = AK_uP_all * param_data.w_cond_mean_K(u);
+          
           
           arma::vec w_par = w.rows(parents_indexing(u));
           
@@ -1720,14 +1711,14 @@ void SpamTreeMVdevel::gibbs_sample_w_std(bool need_update){
             
             if(need_update){
               param_data.Sigi_children(up).slice(c_ix) = 
-                param_data.AK_uP_u_all(u).submat(u_is_which_col_f(up)(c_ix)(0), 
+                AK_uP_u_all.submat(u_is_which_col_f(up)(c_ix)(0), 
                                        u_is_which_col_f(up)(c_ix)(0));
             }
             
             //start = std::chrono::steady_clock::now();
             param_data.Smu_children(up).col(c_ix) = 
-              param_data.AK_uP_all(u).rows(u_is_which_col_f(up)(c_ix)(0)) * w.rows(indexing(u)) -  
-              param_data.AK_uP_u_all(u).submat(u_is_which_col_f(up)(c_ix)(0), 
+              AK_uP_all.rows(u_is_which_col_f(up)(c_ix)(0)) * w.rows(indexing(u)) -  
+              AK_uP_u_all.submat(u_is_which_col_f(up)(c_ix)(0), 
                                      u_is_which_col_f(up)(c_ix)(1)) * w_par.rows(u_is_which_col_f(up)(c_ix)(1));
             
           }

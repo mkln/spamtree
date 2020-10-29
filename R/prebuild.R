@@ -86,6 +86,12 @@ Building...")
     k              <- q * (q-1)/2
     nr             <- nrow(X)
     
+    if(dd == 3){
+      elevation_3d <- T
+    } else {
+      elevation_3d <- F
+    }
+    
     Z <- matrix(0, nrow=nrow(coords), q)
     for(j in 1:q){
       Z[mv_id==j, j] <- 1
@@ -123,9 +129,12 @@ Building...")
       vlim <- prior$vlim
     }
     
-    if(dd == 2){
+    
+    if((dd == 2) || (dd==3 & elevation_3d)){
+      el <- elevation_3d*1
+      
       n_cbase <- ifelse(q > 2, 3, 1)
-      npars <- 3*q + n_cbase
+      npars <- 3*q + n_cbase + el
       
       start_theta <- rep(2, npars) %>% c(rep(1, k))
       
@@ -138,8 +147,8 @@ Building...")
       }
       
       if(n_cbase == 3){
-        start_theta[npars-1] <- .5
-        set_unif_bounds[npars-1,] <- c(btmlim, 1-btmlim)
+        start_theta[npars-1-el] <- .5
+        set_unif_bounds[npars-1-el,] <- c(btmlim, 1-btmlim)
       }
       
       if(q > 1){

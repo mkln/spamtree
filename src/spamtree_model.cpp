@@ -107,21 +107,6 @@ SpamTreeMV::SpamTreeMV(
   
   indexing    = indexing_in;
   
-  /*
-   if(dd == 2){
-   if(q > 2){
-   npars = 1+3;
-   } else {
-   npars = 1+1;
-   }
-   } else {
-   if(q > 2){
-   npars = 1+5;
-   } else {
-   npars = 1+3; // sigmasq + alpha + beta + phi
-   }
-   }*/
-  
   printf("%d observed locations, %d to predict, %d total\n",
          n, y.n_elem-n, y.n_elem);
   
@@ -181,7 +166,12 @@ SpamTreeMV::SpamTreeMV(
   //find_common_descendants();
   
   // initialize covariance model
-  covpars = CovarianceParams(dd, q);
+  if(dd==3){
+    covariance_model = 2;
+  } else {
+    covariance_model = -1; // let it be decided auto
+  }
+  covpars = CovarianceParams(dd, q, covariance_model);
   
   if(verbose){
     end_overall = std::chrono::steady_clock::now();
@@ -746,15 +736,6 @@ void SpamTreeMV::decompose_margin_precision(SpamTreeMVData& data){
   Rcpp::Rcout << "[SpamTreeMV::decompose_margin_precision] done " << endl;
 }
 
-/*
-void SpamTreeMV::collapsed_loglik(SpamTreeMVData& data){
-  for(int i=0; i<data.Ciblocks.n_rows; i++){
-    int u = block_names(i) - 1;
-    // y ~ N( Xbeta, C + tausq diag(n))
-    data.Ciblocks
-  }
-  
-}*/
 
 void SpamTreeMV::get_loglik_w(SpamTreeMVData& data){
   // S=standard gibbs (cheapest), P=residual process, R=residual process using recursive functions
@@ -943,19 +924,19 @@ bool SpamTreeMV::get_loglik_comps_w_std(SpamTreeMVData& data){
       data.loglik_w_comps(u) = (indexing(u).n_elem+.0) 
         * hl2pi -.5 * data.wcore(u);
     }
-  }
-  
-  if(errtype > 0){
-    if(verbose){
-      Rcpp::Rcout << "Cholesky failed at some point. Here's the value of theta that caused this" << endl;
-      Rcpp::Rcout << "ai1: " << covpars.ai1.t() << endl
-                  << "ai2: " << covpars.ai2.t() << endl
-                  << "phi_i: " << covpars.phi_i.t() << endl
-                  << "thetamv: " << covpars.thetamv.t() << endl
-                  << "and Dmat: " << covpars.Dmat << endl;
-      Rcpp::Rcout << " -- auto rejected and proceeding." << endl;
+    
+    if(errtype > 0){
+      if(verbose){
+        Rcpp::Rcout << "Cholesky failed at some point. Here's the value of theta that caused this" << endl;
+        Rcpp::Rcout << "ai1: " << covpars.ai1.t() << endl
+                    << "ai2: " << covpars.ai2.t() << endl
+                    << "phi_i: " << covpars.phi_i.t() << endl
+                    << "thetamv: " << covpars.thetamv.t() << endl
+                    << "and Dmat: " << covpars.Dmat << endl;
+        Rcpp::Rcout << " -- auto rejected and proceeding." << endl;
+      }
+      return false;
     }
-    return false;
   }
   
   //Rcpp::Rcout << "timings: " << timings.t() << endl;
@@ -981,19 +962,6 @@ void SpamTreeMV::deal_with_w(bool need_update){
   // Back-fitting plus IRLS:
   // I=back-fitting and iterated reweighted least squares
   gibbs_sample_w_std(need_update);
-  
-  /*
- switch(use_alg){
- case 'S':
- gibbs_sample_w_std();
- break;
- case 'P':
- gibbs_sample_w_rpx();
- break;*/
-  //case 'I': 
-  //  bfirls_w();
-  //  break;
-  //}
 }
 
 
@@ -1213,152 +1181,6 @@ void SpamTreeMV::gibbs_sample_w_std(bool need_update){
   
 }
 
-/*
- void SpamTreeMV::gibbs_sample_w_rpx(){
- if(verbose & debug){
- start_overall = std::chrono::steady_clock::now();
- Rcpp::Rcout << "[gibbs_sample_w_rpx] " << endl;
- }
- 
- // covariance parameters
- theta_transform(param_data);
- 
- Rcpp::RNGScope scope;
- arma::mat rand_norm_mat = arma::randn(coords.n_rows, q);
- 
- //arma::vec timings = arma::zeros(5);
- //Rcpp::Rcout << "starting loops \n";
- //Rcpp::Rcout << "groups: " << block_groups_labels.t() << endl;
- 
- //arma::mat eta_rpx_mat = eta_rpx.col(0);
- 
- for(int g=0; g<n_actual_groups; g++){
- int grp = block_groups_labels(g) - 1;
- arma::uvec grpuvec = arma::ones<arma::uvec>(1) * grp;
- arma::uvec other_etas = arma::find(block_groups_labels != grp+1);
- 
-//***#pragma omp parallel for 
- for(int i=0; i<u_by_block_groups(g).n_elem; i++){
- int u = u_by_block_groups(g)(i);
- // eta_rpx is cube (location x q x grp)
- 
- //start = std::chrono::steady_clock::now();
- if(res_is_ref(g) == 1){
- // precision
- arma::mat Sigi_tot = tausq_inv * Zblock(u).t() * Zblock(u) + param_data.w_cond_prec(u);
- // Smean
- arma::mat eta_others_q = subcube_collapse_via_sum(eta_rpx, indexing(u), other_etas);
- arma::vec Zw_others = armarowsum(Z.rows(indexing(u)) % eta_others_q);
- arma::mat Smu_tot = tausq_inv * Zblock(u).t() *
- (y.rows(indexing(u)) - X.rows(indexing(u)) * Bcoeff - Zw_others);
- 
- arma::field<arma::mat> KchildKxx(children(u).n_elem);
- for(int c=0; c<children(u).n_elem; c++){
- int cx = children(u)(c);
- arma::mat Kchildc = xCovHUVmv(coords, mv_id, indexing(cx), indexing(u), cparams, Dmat, false);
- 
- arma::mat Kchildren;
- if(parents(u).n_elem > 0){
- // update children locations
- int lp = parents(u)(parents(u).n_elem - 1);
- 
- //start = std::chrono::steady_clock::now();
- arma::mat Kchildx = xCovHUVmv(coords, mv_id, indexing(cx), parents_indexing(u), cparams, Dmat, false);
- //end = std::chrono::steady_clock::now();
- //timings(2) += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
- 
- //start = std::chrono::steady_clock::now();
- Kchildren = Kchildc - Kchildx * param_data.Kxx_inv(lp) * param_data.Kxc(u);
- //end = std::chrono::steady_clock::now();
- //timings(3) += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
- } else {
- Kchildren = Kchildc;
- }
- KchildKxx(c) = Kchildren * param_data.w_cond_prec(u);
- 
- // precision
- Sigi_tot += tausq_inv * KchildKxx(c).t() * Zblock(cx).t() * Zblock(cx) * KchildKxx(c);
- // Smean
- arma::mat eta_others_q = subcube_collapse_via_sum(eta_rpx, indexing(cx), other_etas);
- arma::vec Zw_others = armarowsum(Z.rows(indexing(cx)) % eta_others_q);
- 
- Smu_tot += tausq_inv * KchildKxx(c).t() * Zblock(cx).t() *
- (y.rows(indexing(cx)) - X.rows(indexing(cx)) * Bcoeff - Zw_others);
- }
- 
- arma::mat Sigi_chol = arma::inv(arma::trimatl(arma::chol( arma::symmatu( Sigi_tot ), "lower")));
- 
- 
- // sample independent residual
- //Rcpp::Rcout << "sampling size " << indexing(u).n_elem << endl;
- arma::vec rnvec = arma::randn(indexing(u).n_elem);
- 
- arma::vec w_local = Sigi_chol.t() * (Sigi_chol * Smu_tot + rnvec); 
- arma::mat w_fillmat = arma::trans(arma::mat(w_local.memptr(), q, w_local.n_elem/q));
- 
- // at this resolution we have a q matrix of new w, fill the cube.
- cube_fill(eta_rpx, indexing(u), grp, w_fillmat);
- //eta_rpx_mat.submat(indexing(u), grpuvec) = w_local;
- 
- //end = std::chrono::steady_clock::now();
- //timings(0) += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
- 
- for(int c=0; c<children(u).n_elem; c++){
- int cx = children(u)(c);
- arma::vec w_cx = KchildKxx(c) * w_local;
- 
- //Rcpp::Rcout << arma::size(w_cx) << endl;
- arma::mat w_cx_fillmat = arma::trans(arma::mat(w_cx.memptr(), q, w_cx.n_elem/q));
- cube_fill(eta_rpx, indexing(cx), grp, w_cx_fillmat);
- //eta_rpx_mat.submat(indexing(cx), grpuvec) = w_cx;
- }
- 
- } else {
- arma::mat eta_others_q = subcube_collapse_via_sum(eta_rpx, indexing(u), other_etas);
- arma::vec Zw_others = armarowsum(Z.rows(indexing(u)) % eta_others_q);
- arma::mat w_fillmat = arma::zeros(indexing(u).n_elem, q);
- 
- for(int ix=0; ix<indexing(u).n_elem; ix++){
- //int first_ix = ix*q;
- //int last_ix = ix*q+q-1;
- arma::mat ZZ = Z.row(indexing(u)(ix));
- arma::mat Sigi_tot = param_data.w_cond_prec_noref(u)(ix) +//param_data.w_cond_prec(u).submat(first_ix, first_ix, last_ix, last_ix) + 
- tausq_inv * ZZ.t() * ZZ; 
- arma::mat Smu_tot = tausq_inv * ZZ.t() *
- (y.row(indexing(u)(ix)) - X.row(indexing(u)(ix)) * Bcoeff - Zw_others(ix));
- arma::mat Sigi_chol = arma::inv(arma::trimatl(arma::chol( arma::symmatu( Sigi_tot ), "lower")));
- arma::vec rnvec = arma::randn(q);
- arma::vec w_local = Sigi_chol.t() * (Sigi_chol * Smu_tot + rnvec); 
- w_fillmat.row(ix) = arma::trans(arma::mat(w_local.memptr(), q, w_local.n_elem/q));
- }
- 
- // at this resolution we have a q matrix of new w, fill the cube.
- cube_fill(eta_rpx, indexing(u), grp, w_fillmat);
- //eta_rpx_mat.submat(indexing(u), grpuvec) = w_local;
- 
- //end = std::chrono::steady_clock::now();
- //timings(0) += std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
- }
- 
- }
- }
- 
- //start = std::chrono::steady_clock::now();
- //w = armarowsum(eta_rpx_mat);
- //eta_rpx.col(0) = eta_rpx_mat;
- w = arma::sum(eta_rpx, 2); // sum all resolutions
- Zw = armarowsum(Z % w);
- 
- if(verbose){
- //end = std::chrono::steady_clock::now();
- end_overall = std::chrono::steady_clock::now();
- Rcpp::Rcout << "[gibbs_sample_w_rpx] gibbs loops "
-             << std::chrono::duration_cast<std::chrono::microseconds>(end_overall - start_overall).count()
-             << "us and " 
-             << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "us \n";
- //Rcpp::Rcout << timings.t() << endl;
- }
- }*/
 
 void SpamTreeMV::predict(bool theta_update=true){
   // S=standard gibbs (cheapest), P=residual process, R=residual process using recursive functions
@@ -1446,7 +1268,7 @@ void SpamTreeMV::predict_std(bool sampling=true, bool theta_update=true){
         try {
           Rchol = arma::chol(arma::symmatu(Ktemp), "lower");
         } catch(...){
-          Rcpp::Rcout << Ktemp << endl;
+          //Rcpp::Rcout << Ktemp << endl;
           Ktemp(0,0) = 0;
           Rchol = arma::zeros(1,1);
         }
@@ -1489,14 +1311,7 @@ void SpamTreeMV::predict_std(bool sampling=true, bool theta_update=true){
 }
 
 void SpamTreeMV::deal_with_beta(){
-  //switch(use_alg){
-  //case 'I':
-  //  bfirls_beta();
-  //  break;
-  //default:
   gibbs_sample_beta();
-  //  break;
-  //}
 }
 
 void SpamTreeMV::gibbs_sample_beta(){
@@ -1533,7 +1348,7 @@ void SpamTreeMV::gibbs_sample_tausq(){
     arma::vec XB_availab = XB.rows(na_ix_all);
     arma::mat yrr = y_available.rows(ix_by_q_a(j)) - XB_availab.rows(ix_by_q_a(j)) - Zw_availab.rows(ix_by_q_a(j));
     double bcore = arma::conv_to<double>::from( yrr.t() * yrr );
-    double aparam = 2.0001 + ix_by_q_a(j).n_elem/2.0;
+    double aparam = 2.01 + ix_by_q_a(j).n_elem/2.0;
     double bparam = 1.0/( 1.0 + .5 * bcore );
     
     Rcpp::RNGScope scope;

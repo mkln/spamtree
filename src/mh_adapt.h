@@ -154,7 +154,7 @@ inline void RAMAdapt::adapt(const arma::vec& U, double alpha, int mc){
       started = true;
     }
     i = mc-g0;
-    eta = min(1.0, (p+.0) * pow(i+1.0, -gamma));
+    eta = std::min(1.0, (p+.0) * pow(i+1.0, -gamma));
     alpha = std::min(1.0, alpha);
     
     Sigma = Ip + eta * (alpha - alpha_star) * U * U.t() / arma::accu(U % U);
@@ -320,19 +320,11 @@ inline arma::vec par_transf_back(arma::vec par){
   }
 }
 
-inline arma::vec par_huvtransf_fwd(arma::vec par, const arma::mat& set_unif_bounds){
-  for(int j=0; j<par.n_elem; j++){
-    par(j) = logit(par(j), set_unif_bounds(j, 0), set_unif_bounds(j, 1));
-  }
-  return par;
-}
+//[[Rcpp::export]]
+arma::vec par_huvtransf_fwd(arma::vec par, const arma::mat& set_unif_bounds);
 
-inline arma::vec par_huvtransf_back(arma::vec par, const arma::mat& set_unif_bounds){
-  for(int j=0; j<par.n_elem; j++){
-    par(j) = logistic(par(j), set_unif_bounds(j, 0), set_unif_bounds(j, 1));
-  }
-  return par;
-}
+//[[Rcpp::export]]
+arma::vec par_huvtransf_back(arma::vec par, const arma::mat& set_unif_bounds);
 
 inline bool unif_bounds(arma::vec& par, const arma::mat& bounds){
   bool out_of_bounds = false;
@@ -394,8 +386,8 @@ inline double calc_prior_logratio(const arma::vec& new_param,
   double plr=0;
   for(int j=0; j<param.n_elem; j++){
     plr += 
-      invgamma_logdens(new_param(0), 2.01, 3.0) -
-      invgamma_logdens(param(0), 2.01, 3.0);
+      invgamma_logdens(new_param(0), 2, 1.0) -
+      invgamma_logdens(param(0), 2, 1.0);
   }
   return plr;
 }

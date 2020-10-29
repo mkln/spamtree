@@ -16,6 +16,8 @@ struct CovarianceParams {
   arma::vec phi_i;
   arma::vec thetamv;
   arma::mat Dmat;
+  // if elevation is included
+  double d_elevation;
   
   // for univariate with several inputs
   double sigmasq;
@@ -23,7 +25,7 @@ struct CovarianceParams {
   
   void transform(const arma::vec&);
   
-  CovarianceParams(int, int);
+  CovarianceParams(int, int, int);
   CovarianceParams();
   
 };
@@ -51,8 +53,8 @@ arma::mat cexpcov(const arma::mat& x, const arma::mat& y, const double& sigmasq,
 
 
 void NonspatialUnivariate_inplace(arma::mat& res,
-                         const arma::mat& coords, const arma::uvec& ind1, const arma::uvec& ind2, 
-                         const CovarianceParams& covpars, bool same=false);
+                                  const arma::mat& coords, const arma::uvec& ind1, const arma::uvec& ind2, 
+                                  const CovarianceParams& covpars, bool same=false);
 
 arma::mat NonspatialUnivariate(const arma::mat& coords, const arma::uvec& ind1, const arma::uvec& ind2, 
                                const CovarianceParams& covpars, bool same=false);
@@ -75,10 +77,19 @@ arma::mat mvCovAG20107(const arma::mat& coords, const arma::uvec& qv_block,
                        const CovarianceParams& covpars, bool same=false);
 
 
+// like above, adds elevation
+void mvWithElevation_inplace(arma::mat& res,
+                             const arma::mat& coords, 
+                             const arma::uvec& qv_block,
+                             const arma::uvec& ind1, const arma::uvec& ind2, 
+                             const CovarianceParams& covpars, bool same=false);
+
+// generics
+
 void Covariancef_inplace(arma::mat& res,
-                              const arma::mat& coords, const arma::uvec& qv_block, 
-                              const arma::uvec& ind1, const arma::uvec& ind2, 
-                              const CovarianceParams& covpars, bool same=false);
+                         const arma::mat& coords, const arma::uvec& qv_block, 
+                         const arma::uvec& ind1, const arma::uvec& ind2, 
+                         const CovarianceParams& covpars, bool same=false);
 
 arma::mat Covariancef(
     const arma::mat& coords, const arma::uvec& qv_block, 

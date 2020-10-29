@@ -223,8 +223,8 @@ Rcpp::List spamtree_mv_mcmc(
         if(verbose || debug){
           Rcpp::Rcout << endl;
         }
-        //mesh.get_loglik_w(mesh.param_data);
-        //Rcpp::Rcout << " >>>> CHECK : " << mesh.param_data.loglik_w << endl;
+        //bool nouse = mtree.get_loglik_comps_w( mtree.param_data );
+        //Rcpp::Rcout << " >>>> CHECK : " << current_loglik << " " << mtree.param_data.loglik_w << endl;
       }
       
       ll_upd_msg = current_loglik;
@@ -274,13 +274,15 @@ Rcpp::List spamtree_mv_mcmc(
           //invgamma_logdens(new_param(0), 2, 2) -
           //invgamma_logdens(mtree.param_data.theta(0), 2, 2) +
           jacobian;
+      
         
         if(isnan(logaccept)){
           Rcpp::Rcout << new_param.t() << endl;
           Rcpp::Rcout << param.t() << endl;
           Rcpp::Rcout << new_loglik << " " << current_loglik << " " << jacobian << endl;
-          throw 1;
+          //throw 1;
         }
+        
         
         accepted = do_I_accept(logaccept) & acceptable;
         
@@ -318,7 +320,7 @@ Rcpp::List spamtree_mv_mcmc(
         
         if(adapting){
           //adaptivemc.adapt(par_huvtransf_fwd(param, set_unif_bounds), m); // **
-          adaptivemc.adapt(U_update, exp(logaccept), m); // **
+          adaptivemc.adapt(U_update, acceptable*exp(logaccept), m); // **
         }
         
         
@@ -335,7 +337,7 @@ Rcpp::List spamtree_mv_mcmc(
       //need_update = true;
       need_update = arma::accu(abs(param - predict_param) > 1e-05);
       
-      if((mtree.predicting == true) & sample_predicts){
+      if((mtree.predicting == true) & sample_predicts & sample_w){
         // tell predict() if theta has changed because if not, we can avoid recalculating
         mtree.predict(need_update);
         predict_param = param;

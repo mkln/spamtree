@@ -273,10 +273,8 @@ Rcpp::List spamtree_mv_mcmc_devel(
         prior_logratio = calc_prior_logratio(new_param, param);
         jacobian  = calc_jacobian(new_param, param, set_unif_bounds);
         logaccept = new_loglik - current_loglik + 
-          //prior_logratio + 
+          prior_logratio + 
           //tsqi_ll_ratio + 
-          //invgamma_logdens(new_param(0), 2, 2) -
-          //invgamma_logdens(mtree.param_data.theta(0), 2, 2) +
           jacobian;
         
         
