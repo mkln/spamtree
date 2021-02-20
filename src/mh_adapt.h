@@ -381,13 +381,13 @@ inline double calc_jacobian(const arma::vec& new_param, const arma::vec& param,
 
 
 inline double calc_prior_logratio(const arma::vec& new_param, 
-                                  const arma::vec& param){
+                                  const arma::vec& param, double a=2, double b=1){
   
   double plr=0;
   for(int j=0; j<param.n_elem; j++){
     plr += 
-      invgamma_logdens(new_param(0), 2, 1.0) -
-      invgamma_logdens(param(0), 2, 1.0);
+      invgamma_logdens(new_param(0), a, b) -
+      invgamma_logdens(param(0), a, b);
   }
   return plr;
 }
