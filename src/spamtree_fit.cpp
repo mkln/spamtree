@@ -55,7 +55,11 @@ Rcpp::List spamtree_mv_mcmc(
     bool sample_w=true,
     bool sample_predicts=true){
   
+  
+#ifdef _OPENMP
   omp_set_num_threads(num_threads);
+#endif
+  
   std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
   std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
   
