@@ -69,8 +69,10 @@ lna[((coords_q$Var1 > .2) & (coords_q$Var1 < .7) & (coords_q$Var2 < .7) & (coord
 y <- y_full * lna
 
 
-# prepare for spamtrees
+simdata <- coords %>% cbind(y) %>% as.data.frame()
 
+
+# prepare for spamtrees
 mcmc_keep <- 1000
 mcmc_burn <- 1000
 mcmc_thin <- 2
