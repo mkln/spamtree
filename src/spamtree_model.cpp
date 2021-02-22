@@ -749,7 +749,9 @@ void SpamTreeMV::get_loglik_w_std(SpamTreeMVData& data){
   }
   
   //arma::uvec blocks_not_empty = arma::find(block_ct_obs > 0);
-#pragma omp parallel for //**
+#ifdef _OPENMP
+#pragma omp parallel for 
+#endif
   for(int i=0; i<blocks_not_empty.n_elem; i++){  
     int u = blocks_not_empty(i);
     
@@ -805,7 +807,9 @@ bool SpamTreeMV::get_loglik_comps_w_std(SpamTreeMVData& data){
   int errtype = -1;
   
   for(int g=0; g<n_actual_groups; g++){
+#ifdef _OPENMP
 #pragma omp parallel for 
+#endif
     for(int i=0; i<u_by_block_groups(g).n_elem; i++){
       int u = u_by_block_groups(g)(i);
       //if(block_ct_obs(u) > 0){
@@ -979,8 +983,9 @@ void SpamTreeMV::gibbs_sample_w_std(bool need_update){
   int errtype = -1;
   
   for(int g=n_actual_groups-1; g>=0; g--){
-    
-    #pragma omp parallel for
+#ifdef _OPENMP
+#pragma omp parallel for 
+#endif
     for(int i=0; i<u_by_block_groups(g).n_elem; i++){
       int u = u_by_block_groups(g)(i);
       
@@ -1201,7 +1206,9 @@ void SpamTreeMV::predict_std(bool sampling=true, bool theta_update=true){
   
   // cycle through the resolutions starting from the bottom
   //arma::uvec predicting_blocks = arma::find(block_ct_obs == 0);
-#pragma omp parallel for
+#ifdef _OPENMP
+#pragma omp parallel for 
+#endif
   for(int i=0; i<blocks_predicting.n_elem; i++){
     int u = blocks_predicting(i);
     // meaning this block must be predicted

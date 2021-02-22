@@ -1078,7 +1078,9 @@ void SpamTreeMVdevel::get_loglik_w_std(SpamTreeMVDataDevel& data){
   }
   
   //arma::uvec blocks_not_empty = arma::find(block_ct_obs > 0);
-#pragma omp parallel for //**
+#ifdef _OPENMP
+#pragma omp parallel for 
+#endif
   for(int g=0; g<n_actual_groups-1; g++){
     for(int i=0; i<u_by_block_groups(g).n_elem; i++){
       int u = u_by_block_groups(g)(i);
@@ -1179,7 +1181,9 @@ bool SpamTreeMVdevel::get_loglik_comps_w_std(SpamTreeMVDataDevel& data){
     Kxxi_invchol(g) = arma::field<arma::mat>(cr_caching_uniques(g).n_elem);
     Kxxi_cached(g) = arma::field<arma::mat>(cr_caching_uniques(g).n_elem);
     Kcx_cached(g) = arma::field<arma::mat>(cx_caching_uniques(g).n_elem);
-#pragma omp parallel for
+#ifdef _OPENMP
+#pragma omp parallel for 
+#endif
     for(int i=0; i<cr_caching_uniques(g).n_elem; i++){
       int u = cr_caching_uniques(g)(i);
       if(parents(u).n_elem > 0){
@@ -1370,7 +1374,9 @@ bool SpamTreeMVdevel::get_loglik_comps_w_std(SpamTreeMVDataDevel& data){
   for(int g=0; g<n_actual_groups; g++){
     //Rcpp::Rcout << g << endl;
     start = std::chrono::steady_clock::now();
+#ifdef _OPENMP
 #pragma omp parallel for 
+#endif
     for(int i=0; i<u_by_block_groups(g).n_elem; i++){
       int u = u_by_block_groups(g)(i);
       
@@ -1610,7 +1616,9 @@ void SpamTreeMVdevel::gibbs_sample_w_std(bool need_update){
   //Rcpp::Rcout << "n groups " << n_actual_groups << endl;
   
   for(int g=n_actual_groups-1; g>=0; g--){
-#pragma omp parallel for
+#ifdef _OPENMP
+#pragma omp parallel for 
+#endif
     for(int i=0; i<u_by_block_groups(g).n_elem; i++){
       int u = u_by_block_groups(g)(i);
       //Rcpp::Rcout << g << " " << u << " " << indexing(u).n_elem << endl;
@@ -1767,7 +1775,9 @@ void SpamTreeMVdevel::predict_std(bool sampling=true, bool theta_update=true){
   //arma::uvec predicting_blocks = arma::find(block_ct_obs == 0);
   
   int g = n_actual_groups-1;
-#pragma omp parallel for
+#ifdef _OPENMP
+#pragma omp parallel for 
+#endif
   for(int i=0; i<u_by_block_groups(g).n_elem; i++){
     int u = u_by_block_groups(g)(i);
     

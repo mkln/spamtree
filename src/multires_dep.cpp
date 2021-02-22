@@ -1,5 +1,9 @@
 #include <RcppArmadillo.h>
+
+#ifdef _OPENMP
 #include <omp.h>
+#endif
+
 #include "R.h"
 #include <stdexcept>
 #include <string>
@@ -86,7 +90,9 @@ Rcpp::List make_edges(const arma::mat& parchimat, const arma::uvec& non_empty_bl
   for(int lev=0; lev<L; lev ++){
     // loop the levels of the tree and find the names of the blocks at this level
     arma::vec blocks_this_lev = unique_finite(parchimat.col(lev)); //arma::unique(parchimat.col(lev)); 
-#pragma omp parallel for
+#ifdef _OPENMP
+#pragma omp parallel for 
+#endif
     for(int b=0; b<blocks_this_lev.n_elem; b++){
       int u = blocks_this_lev(b)-1; // index of this block in C
       // zoom into the relevant portion to look into for this block name

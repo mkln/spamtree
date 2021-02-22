@@ -1,5 +1,9 @@
 #include "RcppArmadillo.h"
+
+#ifdef _OPENMP
 #include <omp.h>
+#endif
+
 using namespace std;
 
 //[[Rcpp::export]]
@@ -11,7 +15,9 @@ arma::mat list_mean(const arma::field<arma::mat>& x){
   
   arma::mat result = arma::zeros(nrows, ncols);
   
-  #pragma omp parallel for
+#ifdef _OPENMP
+#pragma omp parallel for 
+#endif
   for(int j=0; j<nrows*ncols; j++){
     //for(int h=0; h<ncols; h++){
     arma::vec slices = arma::zeros(n);
@@ -39,7 +45,9 @@ arma::mat list_cubes_mean(const arma::field<arma::cube>& x, int cslice){
   
   arma::mat result = arma::zeros(nrows, ncols);
   
-#pragma omp parallel for
+#ifdef _OPENMP
+#pragma omp parallel for 
+#endif
   for(int j=0; j<nrows*ncols; j++){
     //for(int h=0; h<ncols; h++){
     arma::vec slices = arma::zeros(n);
@@ -113,7 +121,9 @@ arma::mat list_qtile(const arma::field<arma::mat>& x, double q){
   
   arma::mat result = arma::zeros(nrows, ncols);
   
-#pragma omp parallel for
+#ifdef _OPENMP
+#pragma omp parallel for 
+#endif
   for(int j=0; j<nrows*ncols; j++){
     //for(int h=0; h<ncols; h++){
     arma::vec slices = arma::zeros(n);

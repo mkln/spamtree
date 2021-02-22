@@ -1,5 +1,9 @@
 #include <RcppArmadillo.h>
+
+#ifdef _OPENMP
 #include <omp.h>
+#endif
+
 #include <stdexcept>
 
 #include "R.h"
