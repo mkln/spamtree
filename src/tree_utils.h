@@ -1,5 +1,5 @@
-#ifndef MRES_UTILS 
-#define MRES_UTILS
+#ifndef TREE_UTILS 
+#define TREE_UTILS
 
 #include "RcppArmadillo.h"
 

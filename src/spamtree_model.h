@@ -11,7 +11,7 @@
 #include "mh_adapt.h"
 #include "field_v_concatm.h"
 #include "covariance_functions.h"
-#include "multires_utils.h"
+#include "tree_utils.h"
 
 
 // with indexing

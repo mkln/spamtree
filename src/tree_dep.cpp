@@ -31,8 +31,8 @@ arma::vec kthresholds(arma::vec x,
 Rcpp::StringMatrix col_to_string(const arma::imat& X){
   Rcpp::StringMatrix S(X.n_rows, X.n_cols);
   
-  for(int i=0; i<X.n_rows; i++){
-    for(int j=0; j<X.n_cols; j++){
+  for(unsigned int i=0; i<X.n_rows; i++){
+    for(unsigned int j=0; j<X.n_cols; j++){
       S(i, j) = to_string((X(i,j)-1) % 2);
     }
   }
@@ -42,9 +42,9 @@ Rcpp::StringMatrix col_to_string(const arma::imat& X){
 arma::vec column_threshold(const arma::vec& col1, const arma::vec& thresholds){
   //col %>% sapply(function(x) as.character(1+sum(x >= thresholds)))
   arma::vec result = arma::zeros(col1.n_elem);
-  for(int i=0; i<col1.n_elem; i++){
+  for(unsigned int i=0; i<col1.n_elem; i++){
     int overthreshold = 1;
-    for(int j=0; j<thresholds.n_elem; j++){
+    for(unsigned int j=0; j<thresholds.n_elem; j++){
       if(col1(i) >= thresholds(j)){
         overthreshold += 1;
       }
@@ -59,7 +59,7 @@ arma::mat part_axis_parallel_lmt(const arma::mat& coords, const arma::field<arma
   //Rcpp::Rcout << "~ Axis-parallel partitioning for LMTrees... ";
   arma::mat resultmat = arma::zeros(arma::size(coords));
   
-  for(int j=0; j<coords.n_cols; j++){
+  for(unsigned int j=0; j<coords.n_cols; j++){
     resultmat.col(j) = column_threshold(coords.col(j), thresholds(j));
   }
   //Rcpp::Rcout << "done." << endl;
@@ -93,7 +93,7 @@ Rcpp::List make_edges(const arma::mat& parchimat, const arma::uvec& non_empty_bl
 #ifdef _OPENMP
 #pragma omp parallel for 
 #endif
-    for(int b=0; b<blocks_this_lev.n_elem; b++){
+    for(unsigned int b=0; b<blocks_this_lev.n_elem; b++){
       int u = blocks_this_lev(b)-1; // index of this block in C
       // zoom into the relevant portion to look into for this block name
       arma::mat sub_parchi = parchimat.rows( arma::find(parchimat.col(lev) == blocks_this_lev(b)) );
@@ -148,7 +148,7 @@ Rcpp::List make_edges_limited(const arma::mat& parchimat, const arma::uvec& non_
   for(int lev=0; lev<L; lev ++){
     // loop the levels of the tree and find the names of the blocks at this level
     arma::vec blocks_this_lev = unique_finite(parchimat.col(lev)); //arma::unique(parchimat.col(lev)); 
-    for(int b=0; b<blocks_this_lev.n_elem; b++){
+    for(unsigned int b=0; b<blocks_this_lev.n_elem; b++){
       int u = blocks_this_lev(b)-1; // index of this block in C
       // zoom into the relevant portion to look into for this block name
       arma::mat sub_parchi = parchimat.rows( arma::find(parchimat.col(lev) == blocks_this_lev(b)) );
@@ -203,7 +203,7 @@ Rcpp::List make_edges_old(const arma::mat& parchimat, const arma::uvec& non_empt
   for(int lev=0; lev<L; lev ++){
     // loop the levels of the tree and find the names of the blocks at this level
     arma::vec blocks_this_lev = unique_finite(parchimat.col(lev)); //arma::unique(parchimat.col(lev)); 
-    for(int b=0; b<blocks_this_lev.n_elem; b++){
+    for(unsigned int b=0; b<blocks_this_lev.n_elem; b++){
       int u = blocks_this_lev(b)-1; // index of this block in C
       // zoom into the relevant portion to look into for this block name
       arma::mat sub_parchi = parchimat.rows( arma::find(parchimat.col(lev) == blocks_this_lev(b)) );
@@ -241,9 +241,9 @@ arma::umat number_revalue(const arma::umat& original_mat, const arma::uvec& from
   arma::umat output_mat = original_mat;
   int maxval = to_val.max();
   
-  for(int i=0; i<original_mat.n_rows; i++){
-    for(int c=0; c<original_mat.n_cols; c++){
-      int j=0;
+  for(unsigned int i=0; i<original_mat.n_rows; i++){
+    for(unsigned int c=0; c<original_mat.n_cols; c++){
+      unsigned int j=0;
       for(j=0; j<from_val.n_elem; j++){
         if(original_mat(i, c) == from_val(j)){
           output_mat(i, c) = to_val(j);

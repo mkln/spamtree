@@ -99,14 +99,15 @@ arma::mat cexpcov(const arma::mat& x, const arma::mat& y, const double& sigmasq,
     int np = x.n_rows;
     arma::mat K = sigmasq * exp(-phi * sqrt(abs(arma::repmat(pmag.t(), np, 1) + arma::repmat(pmag, 1, np) - 2 * x * x.t())));
     return K;
-  } else {
-    arma::mat pmag = arma::sum(x % x, 1);
-    arma::mat qmag = arma::sum(y % y, 1);
-    int np = x.n_rows;
-    int nq = y.n_rows;
-    arma::mat K = sigmasq * exp(-phi * sqrt(abs(arma::repmat(qmag.t(), np, 1) + arma::repmat(pmag, 1, nq) - 2 * x * y.t())));
-    return K;
-  }
+  } 
+  
+  arma::mat pmag = arma::sum(x % x, 1);
+  arma::mat qmag = arma::sum(y % y, 1);
+  int np = x.n_rows;
+  int nq = y.n_rows;
+  arma::mat K = sigmasq * exp(-phi * sqrt(abs(arma::repmat(qmag.t(), np, 1) + arma::repmat(pmag, 1, nq) - 2 * x * y.t())));
+  return K;
+  
 }
 
 double C_base(const double& h, const double& u, const double& v, const arma::vec& params, const int& q, const int& dim){
@@ -157,13 +158,13 @@ void mvWithElevation_inplace(arma::mat& res,
   //weights(2) = covpars.d_elevation;
   
   if(same){
-    for(int i=0; i<ind1.n_elem; i++){
+    for(unsigned int i=0; i<ind1.n_elem; i++){
       v_ix_i = qv_block(ind1(i));
       double ai1_sq = covpars.ai1(v_ix_i) * covpars.ai1(v_ix_i);
       double ai2_sq = covpars.ai2(v_ix_i) * covpars.ai2(v_ix_i);
       arma::rowvec cxi = coords.row(ind1(i));
       
-      for(int j=i; j<ind2.n_elem; j++){
+      for(unsigned int j=i; j<ind2.n_elem; j++){
         delta = cxi - coords.row(ind2(j));
         h = arma::norm(weights % delta.subvec(0, 2));
         u = d < 4? 0 : abs(delta(3));
@@ -181,13 +182,13 @@ void mvWithElevation_inplace(arma::mat& res,
     }
     res = arma::symmatu(res);
   } else {
-    for(int i=0; i<ind1.n_elem; i++){
+    for(unsigned int i=0; i<ind1.n_elem; i++){
       v_ix_i = qv_block(ind1(i));
       double ai1_sq = covpars.ai1(v_ix_i) * covpars.ai1(v_ix_i);
       double ai2_sq = covpars.ai2(v_ix_i) * covpars.ai2(v_ix_i);
       arma::rowvec cxi = coords.row(ind1(i));
       
-      for(int j=0; j<ind2.n_elem; j++){
+      for(unsigned int j=0; j<ind2.n_elem; j++){
         delta = cxi - coords.row(ind2(j));
         h = arma::norm(weights % delta.subvec(0, 2));
         u = d < 4? 0 : abs(delta(3));
@@ -232,13 +233,13 @@ void mvCovAG20107_inplace(arma::mat& res,
     // C_base params: cparams.subvec(3*p, 3*p + k - 1); // k = q>2? 3 : 1;
     
     if(same){
-      for(int i=0; i<ind1.n_elem; i++){
+      for(unsigned int i=0; i<ind1.n_elem; i++){
         v_ix_i = qv_block(ind1(i));
         double ai1_sq = covpars.ai1(v_ix_i) * covpars.ai1(v_ix_i);
         double ai2_sq = covpars.ai2(v_ix_i) * covpars.ai2(v_ix_i);
         arma::rowvec cxi = coords.row(ind1(i));
         
-        for(int j=i; j<ind2.n_elem; j++){
+        for(unsigned int j=i; j<ind2.n_elem; j++){
           delta = cxi - coords.row(ind2(j));
           h = arma::norm(delta.subvec(0, 1));
           u = d < 3? 0 : abs(delta(2));
@@ -256,13 +257,13 @@ void mvCovAG20107_inplace(arma::mat& res,
       }
       res = arma::symmatu(res);
     } else {
-      for(int i=0; i<ind1.n_elem; i++){
+      for(unsigned int i=0; i<ind1.n_elem; i++){
         v_ix_i = qv_block(ind1(i));
         double ai1_sq = covpars.ai1(v_ix_i) * covpars.ai1(v_ix_i);
         double ai2_sq = covpars.ai2(v_ix_i) * covpars.ai2(v_ix_i);
         arma::rowvec cxi = coords.row(ind1(i));
         
-        for(int j=0; j<ind2.n_elem; j++){
+        for(unsigned int j=0; j<ind2.n_elem; j++){
           delta = cxi - coords.row(ind2(j));
           h = arma::norm(delta.subvec(0, 1));
           u = d < 3? 0 : abs(delta(2));
@@ -281,6 +282,7 @@ void mvCovAG20107_inplace(arma::mat& res,
       //return res;
     }
   }
+  
 }
 
 arma::mat mvCovAG20107(const arma::mat& coords, const arma::uvec& qv_block, 
@@ -296,22 +298,25 @@ arma::mat mvCovAG20107(const arma::mat& coords, const arma::uvec& qv_block,
 }
 
 
-// for predictions
-
-arma::mat mvCovAG20107x(const arma::mat& coords1,
-                        const arma::uvec& qv_block1,
-                        const arma::mat& coords2,
-                        const arma::uvec& qv_block2,
-                        const arma::vec& ai1, const arma::vec& ai2,
-                        const arma::vec& phi_i, const arma::vec& thetamv,
-                        const arma::mat& Dmat, bool same){
+arma::mat CrossCovarianceAG10(arma::mat coords1,
+                              arma::uvec mv1,
+                              arma::mat coords2,
+                              arma::uvec mv2,
+                              arma::vec ai1, 
+                              arma::vec ai2,
+                              arma::vec phi_i, 
+                              arma::vec thetamv,
+                              arma::mat Dmat){
   
   arma::mat res = arma::zeros(coords1.n_rows, coords2.n_rows);
+  mv1 -= 1;
+  mv2 -= 1;
   
   int d = coords1.n_cols;
   int p = Dmat.n_cols;
   if((d == 2) & (p < 2)){
-    res = cexpcov(coords1, coords2, ai1(0), thetamv(0), false);
+    Rcpp::stop("Invalid Dmat for multivariate data");
+    return res;
   } else {
     int v_ix_i;
     int v_ix_j;
@@ -323,18 +328,18 @@ arma::mat mvCovAG20107x(const arma::mat& coords1,
     // covpars.ai2 params: cparams.subvec(p, 2*p-1);
     // covpars.phi_i params: cparams.subvec(2*p, 3*p-1);
     // C_base params: cparams.subvec(3*p, 3*p + k - 1); // k = q>2? 3 : 1;
-    for(int i=0; i<coords1.n_rows; i++){
-      v_ix_i = qv_block1(i);
+    for(unsigned int i=0; i<coords1.n_rows; i++){
+      v_ix_i = mv1(i);
       double ai1_sq = ai1(v_ix_i) * ai1(v_ix_i);
       double ai2_sq = ai2(v_ix_i) * ai2(v_ix_i);
       arma::rowvec cxi = coords1.row(i);
       
-      for(int j=0; j<coords2.n_rows; j++){
+      for(unsigned int j=0; j<coords2.n_rows; j++){
         delta = cxi - coords2.row(j);
         h = arma::norm(delta.subvec(0, 1));
         u = d < 3? 0 : abs(delta(2));
         
-        v_ix_j = qv_block2(j);
+        v_ix_j = mv2(j);
         v = Dmat(v_ix_i, v_ix_j);
         
         if(v == 0){ // v_ix_i == v_ix_j
@@ -353,11 +358,11 @@ arma::mat mvCovAG20107x(const arma::mat& coords1,
 void NonspatialUnivariate_inplace(arma::mat& res,
                                   const arma::mat& coords, const arma::uvec& ind1, const arma::uvec& ind2, 
                                   const CovarianceParams& covpars, bool same){
-  int d = coords.n_cols;
+
   if(same){
-    for(int i=0; i<ind1.n_elem; i++){
+    for(unsigned int i=0; i<ind1.n_elem; i++){
       arma::rowvec cri = coords.row(ind1(i));
-      for(int j=i; j<ind2.n_elem; j++){
+      for(unsigned int j=i; j<ind2.n_elem; j++){
         arma::rowvec deltasq = cri - coords.row(ind2(j));
         double weighted = (arma::accu(covpars.kweights.t() % deltasq % deltasq));
         res(i, j) = covpars.sigmasq * exp(-weighted) + (weighted == 0? 1e-3 : 0);
@@ -366,9 +371,9 @@ void NonspatialUnivariate_inplace(arma::mat& res,
     res = arma::symmatu(res);
   } else {
     //int cc = 0;
-    for(int i=0; i<ind1.n_elem; i++){
+    for(unsigned int i=0; i<ind1.n_elem; i++){
       arma::rowvec cri = coords.row(ind1(i));
-      for(int j=0; j<ind2.n_elem; j++){
+      for(unsigned int j=0; j<ind2.n_elem; j++){
         arma::rowvec deltasq = cri - coords.row(ind2(j));
         double weighted = (arma::accu(covpars.kweights.t() % deltasq % deltasq));
         res(i, j) = covpars.sigmasq * exp(-weighted) + (weighted == 0? 1e-3 : 0);
@@ -415,8 +420,7 @@ arma::mat Covariancef(const arma::mat& coords, const arma::uvec& qv_block,
   int n2 = ind2.n_elem;
   arma::mat res = arma::zeros(n1, n2);
   if(covpars.covariance_model < 0){
-    Rcpp::Rcout << "Covariance model not implemented " << endl;
-    throw 1;
+    Rcpp::stop("Covariance model not implemented");
   }
   if(covpars.covariance_model == 0){
     mvCovAG20107_inplace(res, coords, qv_block, ind1, ind2, 

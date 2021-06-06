@@ -42,8 +42,6 @@ SpamTreeMV::SpamTreeMV(
   bool v=false,
   bool debugging=false){
   
-  
-  
   use_alg = use_alg_in; //S:standard, P:residual process, R: rp recursive
   max_num_threads = max_num_threads_in;
   
@@ -81,9 +79,8 @@ SpamTreeMV::SpamTreeMV(
   n_actual_groups     = n_gibbs_groups;
   n_blocks            = block_names.n_elem;
   
-  Rcpp::Rcout << n_gibbs_groups << " resolution layers. " << endl;
-  //Rcpp::Rcout << block_groups_labels << endl;
-  
+  Rcpp::Rcout << n_gibbs_groups << " tree branching levels. " << endl;
+
   na_ix_all   = arma::find_finite(y.col(0));
   y_available = y.rows(na_ix_all);
   X_available = X.rows(na_ix_all); 
@@ -107,7 +104,7 @@ SpamTreeMV::SpamTreeMV(
   
   indexing    = indexing_in;
   
-  printf("%d observed locations, %d to predict, %d total\n",
+  Rprintf("%d observed locations, %d to predict, %d total\n",
          n, y.n_elem-n, y.n_elem);
   
   // init
@@ -191,7 +188,7 @@ void SpamTreeMV::make_gibbs_groups(){
       if(block_groups(u) == block_groups_labels(g)){
         if(indexing(u).n_elem > 0){ //**
           
-          for(int pp=0; pp<parents(u).n_elem; pp++){
+          for(unsigned int pp=0; pp<parents(u).n_elem; pp++){
             if(block_groups(parents(u)(pp)) == block_groups_labels(g)){
               Rcpp::Rcout << u << " <--- " << parents(u)(pp) 
                           << ": same group (" << block_groups(u) 
@@ -199,7 +196,7 @@ void SpamTreeMV::make_gibbs_groups(){
               throw 1;
             }
           }
-          for(int cc=0; cc<children(u).n_elem; cc++){
+          for(unsigned int cc=0; cc<children(u).n_elem; cc++){
             if(block_groups(children(u)(cc)) == block_groups_labels(g)){
               Rcpp::Rcout << u << " ---> " << children(u)(cc) 
                           << ": same group (" << block_groups(u) 
@@ -258,7 +255,7 @@ void SpamTreeMV::make_gibbs_groups(){
       blocks_not_empty(ne) = u;
       ne ++;
       // determine if this block is reference
-      for(int r=0; r<which_not_reference.n_elem; r++){
+      for(unsigned int r=0; r<which_not_reference.n_elem; r++){
         // non-reference include predictions but we are not including those in u_by_block_groups
         if(which_not_reference(r) < u_by_block_groups.n_elem){
           arma::uvec lookforit = arma::find(u_by_block_groups(which_not_reference(r)) == u);
@@ -309,7 +306,7 @@ void SpamTreeMV::init_indexing(){
     if(parents(u).n_elem > 0){
       //Rcpp::Rcout << "n. parents " << parents(u).n_elem << endl;
       arma::field<arma::uvec> pixs(parents(u).n_elem);
-      for(int pi=0; pi<parents(u).n_elem; pi++){
+      for(unsigned int pi=0; pi<parents(u).n_elem; pi++){
         pixs(pi) = indexing(parents(u)(pi));//arma::find( blocking == parents(u)(pi)+1 ); // parents are 0-indexed 
       }
       parents_indexing(u) = field_v_concat_uv(pixs);
@@ -317,7 +314,7 @@ void SpamTreeMV::init_indexing(){
     
     if(children(u).n_elem > 0){
       arma::field<arma::uvec> cixs(children(u).n_elem);
-      for(int ci=0; ci<children(u).n_elem; ci++){
+      for(unsigned int ci=0; ci<children(u).n_elem; ci++){
         //Rcpp::Rcout << "n. children " << children(u).n_elem << endl;
         //Rcpp::Rcout << "--> " << children(u)(ci) << endl;
         cixs(ci) = indexing(children(u)(ci));//arma::find( blocking == children(u)(ci)+1 ); // children are 0-indexed 
@@ -344,7 +341,7 @@ void SpamTreeMV::init_finalize(){
     //if(coords_blocks(u).n_elem > 0){
     if(indexing(u).n_elem > 0){
       dim_by_parent(u) = arma::zeros(parents(u).n_elem + 1);
-      for(int j=0; j<parents(u).n_elem; j++){
+      for(unsigned int j=0; j<parents(u).n_elem; j++){
         dim_by_parent(u)(j+1) = indexing(parents(u)(j)).n_elem;//coords_blocks(parents(u)(j)).n_rows;
       }
       dim_by_parent(u) = arma::cumsum(dim_by_parent(u));
@@ -362,7 +359,7 @@ void SpamTreeMV::init_finalize(){
     u_is_which_col_f(u) = arma::field<arma::field<arma::uvec> > (children(u).n_elem);
     this_is_jth_child(u) = arma::zeros<arma::uvec> (parents(u).n_elem);
     
-    for(int c=0; c<children(u).n_elem; c++){
+    for(unsigned int c=0; c<children(u).n_elem; c++){
       int child = children(u)(c);
       //Rcpp::Rcout << "child: " << child << "\n";
       // which parent of child is u which we are sampling
@@ -386,7 +383,7 @@ void SpamTreeMV::init_finalize(){
     }
     
     if(block_ct_obs(u) > 0){
-      for(int p=0; p<parents(u).n_elem; p++){
+      for(unsigned int p=0; p<parents(u).n_elem; p++){
         int up = parents(u)(p);
         arma::uvec cuv = arma::find(children(up) == u, 1, "first");
         this_is_jth_child(u)(p) = cuv(0); 
@@ -455,7 +452,7 @@ void SpamTreeMV::init_model_data(const arma::vec& theta_in){
       if(block_ct_obs(u) > 0){
         param_data.w_cond_prec_noref(u) = arma::field<arma::mat>(indexing(u).n_elem);
         param_data.Sigi_chol_noref(u) = arma::field<arma::mat>(indexing(u).n_elem);
-        for(int j=0; j<indexing(u).n_elem; j++){
+        for(unsigned int j=0; j<indexing(u).n_elem; j++){
           param_data.w_cond_prec_noref(u)(j) = arma::zeros(q, q);
           param_data.Sigi_chol_noref(u)(j) = arma::zeros(q, q);
         }
@@ -472,7 +469,7 @@ void SpamTreeMV::init_model_data(const arma::vec& theta_in){
   
   alter_data                = param_data; 
   
-  Rcpp::Rcout << "init_model_data: indexing elements: " << indexing.n_elem << endl;
+  //Rcpp::Rcout << "init_model_data: indexing elements: " << indexing.n_elem << endl;
   
 }
 
@@ -496,7 +493,7 @@ arma::mat SpamTreeMV::Ci_ij(int block_i, int block_j, SpamTreeMVData& data){
       // block diagonal at non-reference blocks, save memory by not saving all the zeros. 
       // save as column vector representing the diagonal here
       result = arma::zeros(indexing(block_i).n_elem, 1);
-      for(int i=0; i<data.w_cond_prec_noref(block_i).n_elem; i++){
+      for(unsigned int i=0; i<data.w_cond_prec_noref(block_i).n_elem; i++){
         result(i, 0) = data.w_cond_prec_noref(block_i)(i)(0,0);
       }
       return result;
@@ -549,7 +546,7 @@ arma::mat SpamTreeMV::Ci_ij(int block_i, int block_j, SpamTreeMVData& data){
           Ri_k = data.w_cond_prec(block_k);
         } else {
           Ri_k = arma::zeros(data.w_cond_prec_noref(block_k).n_elem, 1); 
-          for(int s=0; s<Ri_k.n_rows; s++){
+          for(unsigned int s=0; s<Ri_k.n_rows; s++){
             //Rcpp::Rcout << arma::size(data.w_cond_prec_noref(block_k)(s)) << endl;
             Ri_k(s, 0) = data.w_cond_prec_noref(block_k)(s)(0,0);
           }
@@ -623,7 +620,7 @@ arma::mat SpamTreeMV::Ci_ij(int block_i, int block_j, SpamTreeMVData& data){
           result += IminusH_ki.t() * Ri_k * IminusH_kj;
         } else {
           arma::mat Rik_IminusH = arma::zeros(Ri_k.n_rows, IminusH_kj.n_cols);
-          for(int s=0; s<Ri_k.n_rows; s++){
+          for(unsigned int s=0; s<Ri_k.n_rows; s++){
             Rik_IminusH.row(s) = Ri_k(s,0) * IminusH_kj.row(s);
           }
           result += IminusH_ki.t() * Rik_IminusH;
@@ -695,7 +692,7 @@ void SpamTreeMV::decompose_margin_precision(SpamTreeMVData& data){
   Rcpp::Rcout << "[SpamTreeMV::decompose_margin_precision] start " << endl;
   for(int g=n_actual_groups-1; g>=0; g--){
 //////***#pragma omp parallel for
-    for(int i=0; i<u_by_block_groups(g).n_elem; i++){
+    for(unsigned int i=0; i<u_by_block_groups(g).n_elem; i++){
       int u = u_by_block_groups(g)(i);
       
       data.Riblocks(u) = data.Ciblocks(u, u);
@@ -707,7 +704,7 @@ void SpamTreeMV::decompose_margin_precision(SpamTreeMVData& data){
         Dinv = 1.0/data.Riblocks(u); // this is a vector representing the diagonal of Riblocks(u)
       }
       
-      for(int p=0; p<parents(u).n_elem; p++){
+      for(unsigned int p=0; p<parents(u).n_elem; p++){
         int pj = parents(u)(p);
         arma::mat HRi_pj = -data.Ciblocks(u, pj).t();
         
@@ -715,12 +712,12 @@ void SpamTreeMV::decompose_margin_precision(SpamTreeMVData& data){
           data.Hblocks(u, pj) = - Dinv * data.Ciblocks(u, pj); 
         } else {
           data.Hblocks(u, pj) = arma::zeros(indexing(u).n_rows, indexing(pj).n_rows);
-          for(int r=0; r<indexing(u).n_rows; r++){
+          for(unsigned int r=0; r<indexing(u).n_rows; r++){
             data.Hblocks(u, pj).row(r) = - Dinv(r) * data.Ciblocks(u, pj).row(r);
           }
         } 
         
-        for(int g=0; g<parents(u).n_elem; g++){
+        for(unsigned int g=0; g<parents(u).n_elem; g++){
           int gj = parents(u)(g);
           if(data.Ciblocks(pj, gj).n_rows > 0){
             if(data.Hblocks(u, gj).n_rows > 0){
@@ -752,7 +749,7 @@ void SpamTreeMV::get_loglik_w_std(SpamTreeMVData& data){
 #ifdef _OPENMP
 #pragma omp parallel for 
 #endif
-  for(int i=0; i<blocks_not_empty.n_elem; i++){  
+  for(unsigned int i=0; i<blocks_not_empty.n_elem; i++){  
     int u = blocks_not_empty(i);
     
     //arma::mat w_x = arma::vectorise( arma::trans( w.rows(indexing(u)) ) );
@@ -769,7 +766,7 @@ void SpamTreeMV::get_loglik_w_std(SpamTreeMVData& data){
       // conditional independence here.
       data.wcore(u) = 0;
       arma::uvec ones = arma::ones<arma::uvec>(1);
-      for(int ix=0; ix<indexing(u).n_elem; ix++){
+      for(unsigned int ix=0; ix<indexing(u).n_elem; ix++){
         data.wcore(u) += w_x(ix) * data.w_cond_prec_noref(u)(ix)(0,0) *  w_x(ix);
       }
     }
@@ -810,7 +807,7 @@ bool SpamTreeMV::get_loglik_comps_w_std(SpamTreeMVData& data){
 #ifdef _OPENMP
 #pragma omp parallel for 
 #endif
-    for(int i=0; i<u_by_block_groups(g).n_elem; i++){
+    for(unsigned int i=0; i<u_by_block_groups(g).n_elem; i++){
       int u = u_by_block_groups(g)(i);
       //if(block_ct_obs(u) > 0){
       //Rcpp::Rcout << "u: " << u << " obs: " << block_ct_obs(u) << " parents: " << parents(u).t() << "\n"; 
@@ -886,7 +883,7 @@ bool SpamTreeMV::get_loglik_comps_w_std(SpamTreeMVData& data){
           //start = std::chrono::steady_clock::now();
           data.wcore(u) = 0;
           arma::uvec ones = arma::ones<arma::uvec>(1);
-          for(int ix=0; ix<indexing(u).n_elem; ix++){
+          for(unsigned int ix=0; ix<indexing(u).n_elem; ix++){
             arma::uvec uix = ones * indexing(u)(ix);
             //arma::uvec ix_q = arma::regspace<arma::uvec>(ix*q, ix*q+q-1);
             int first_ix = ix;
@@ -986,7 +983,7 @@ void SpamTreeMV::gibbs_sample_w_std(bool need_update){
 #ifdef _OPENMP
 #pragma omp parallel for 
 #endif
-    for(int i=0; i<u_by_block_groups(g).n_elem; i++){
+    for(unsigned int i=0; i<u_by_block_groups(g).n_elem; i++){
       int u = u_by_block_groups(g)(i);
       
       //Rcpp::Rcout << "u: " << u << " g: " << g << endl;
@@ -1070,7 +1067,7 @@ void SpamTreeMV::gibbs_sample_w_std(bool need_update){
         //arma::uvec gix_here = gix_block.elem(indexing(u));
         //arma::uvec unique_coords = arma::unique(gix_here);
         
-        for(int ix=0; ix<indexing(u).n_elem; ix++){
+        for(unsigned int ix=0; ix<indexing(u).n_elem; ix++){
           //for(int ix=0; ix<unique_coords.n_elem; ix++){
           
           //start = std::chrono::steady_clock::now();
@@ -1131,7 +1128,7 @@ void SpamTreeMV::gibbs_sample_w_std(bool need_update){
         //start = std::chrono::steady_clock::now();
         // update parents' Sigi_children and Smu_children
         
-        for(int p=0; p<parents(u).n_elem; p++){
+        for(unsigned int p=0; p<parents(u).n_elem; p++){
           //Rcpp::Rcout << "u: " << u << " " << parents_indexing(u).n_elem << endl;
           // up is the parent
           int up = parents(u)(p);
@@ -1209,7 +1206,7 @@ void SpamTreeMV::predict_std(bool sampling=true, bool theta_update=true){
 #ifdef _OPENMP
 #pragma omp parallel for 
 #endif
-  for(int i=0; i<blocks_predicting.n_elem; i++){
+  for(unsigned int i=0; i<blocks_predicting.n_elem; i++){
     int u = blocks_predicting(i);
     // meaning this block must be predicted
     //start = std::chrono::steady_clock::now();
@@ -1264,7 +1261,7 @@ void SpamTreeMV::predict_std(bool sampling=true, bool theta_update=true){
     //start = std::chrono::steady_clock::now();
     if(sampling){
       arma::uvec ones = arma::ones<arma::uvec>(1);
-      for(int ix=0; ix<indexing(u).n_elem; ix++){
+      for(unsigned int ix=0; ix<indexing(u).n_elem; ix++){
         arma::uvec uix = ones * indexing(u)(ix);
         int first_ix = ix;
         int last_ix = ix;

@@ -98,10 +98,12 @@ arma::mat Covariancef(
 
 
 //[[Rcpp::export]]
-arma::mat mvCovAG20107x(const arma::mat& coords1,
-                        const arma::uvec& qv_block1,
-                        const arma::mat& coords2,
-                        const arma::uvec& qv_block2,
-                        const arma::vec& ai1, const arma::vec& ai2,
-                        const arma::vec& phi_i, const arma::vec& thetamv,
-                        const arma::mat& Dmat, bool same=false);
+arma::mat CrossCovarianceAG10(arma::mat coords1,
+                              arma::uvec mv1,
+                              arma::mat coords2,
+                              arma::uvec mv2,
+                              arma::vec ai1, 
+                              arma::vec ai2,
+                              arma::vec phi_i, 
+                              arma::vec thetamv,
+                              arma::mat Dmat);

@@ -53,7 +53,7 @@ B <- c(-.9, .05)
 
 # generate covariance matrix for full GP
 system.time({
-  CC <- spamtree::mvCovAG20107x(cx, mv_id-1, cx, mv_id-1, ai1, ai2, phi_i, thetamv, Dmat, T)
+  CC <- spamtree:::mvCovAG20107x(cx, mv_id-1, cx, mv_id-1, ai1, ai2, phi_i, thetamv, Dmat, T)
 })
 LC <- t(chol(CC))
 
@@ -73,15 +73,17 @@ simdata <- coords %>% cbind(y) %>% as.data.frame()
 
 
 # prepare for spamtrees
-mcmc_keep <- 1000
-mcmc_burn <- 1000
+mcmc_keep <- 100
+mcmc_burn <- 100
 mcmc_thin <- 2
 
 # we sample w so we center and dont include intercept in X
 ybar <- mean(y, na.rm=T)
 
-# preprocessing before computing
-stp <- spamtree::prebuild(y - ybar, # vector of outcomes
+
+spamtree_time <- system.time({
+  set.seed(1)
+  spamtree_done <- spamtree:::spamtree(y - ybar, # vector of outcomes
                        X, # matrix of covariates
                        coords[,1:2], # matrix of coordinates
                        mv_id,  # vector of outcome ids (with values in {1, ..., q})
@@ -94,9 +96,9 @@ stp <- spamtree::prebuild(y - ybar, # vector of outcomes
                        limited_tree = F, # removes all recursions and makes a tree with delta=1 as in the manuscript
                        cherrypick_same_margin = T, # for non-reference: choose based on same margin (T) or based solely on distance (F)
                        cherrypick_group_locations = T, # for non-reference: T=[q-variate outcome at each location], F=[1-variate outcome at each (location, mv_id)]
-                       use_alg = 'S', # not in use currently
+                       
                        mcmc = list(keep=mcmc_keep, burn=mcmc_burn, thin=mcmc_thin), # mcmc iterations. total = mcmc_burn + mcmc_thin*mcmc_keep
-                       settings    = list(adapting=T, mcmcsd=.1, 
+                       settings    = list(adapting=T, mcmcsd=.01, 
                                           verbose=F, debug=F, printall=F), # some additional mcmc settings
                        prior=list(btmlim=1e-3, toplim=15), # bounds for all priors of parameters being sampled via metropolis
                        debug       = list(sample_beta=T, sample_tausq=T, 
@@ -104,18 +106,14 @@ stp <- spamtree::prebuild(y - ybar, # vector of outcomes
                                           sample_w=T, sample_predicts=T), # things can be turned off. the "starting" parameter -not used here- can be used to fix some things
                        num_threads = 10 # number of OMP threads
 )
-
-# run mcmc -- which will also compute predictions at the missing locations
-spamtree_time <- system.time({
-  set.seed(1)
-  spamtree_done <- spamtree::spamtree(model_data=stp)
 })
+
 
 # predictions
 y_out <- spamtree_done$yhat_mcmc %>% meshgp::list_mean() %>% add(ybar)
 w_out <- spamtree_done$w_mcmc %>% meshgp::list_mean()
 
-outdf <- spamtree_done$model_data$coords_blocking %>% 
+outdf <- spamtree_done$coordsinfo %>% 
   rename(mv_id = sort_mv_id) %>%
   cbind(data.frame(w_mvmr = w_out, 
                    y_mvmr = y_out))

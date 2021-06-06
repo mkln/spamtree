@@ -1,8 +1,5 @@
 #include "spamtree_model.h"
-#include "multires_utils.h"
 #include "interrupt_handler.h"
-
-#include <iostream>
 
 //[[Rcpp::export]]
 Rcpp::List spamtree_mv_mcmc(
@@ -83,7 +80,7 @@ Rcpp::List spamtree_mv_mcmc(
   //int npars;
   double dlim=0;
   Rcpp::Rcout << "d=" << d << " q=" << q << ".\n";
-  Rcpp::Rcout << "Lower and upper bounds for priors:\n";
+  //Rcpp::Rcout << "Lower and upper bounds for priors:\n";
 
   /*
   if(d == 2){
@@ -122,11 +119,11 @@ Rcpp::List spamtree_mv_mcmc(
   //metropolis_sd.submat(0, 0, npars-1, npars-1) = mcmcsd;
   //metropolis_sd.submat(npars, npars, npars+q-1, npars+q-1) = .1 * arma::eye(q, q);
   
-  Rcpp::Rcout << set_unif_bounds << endl;
+  //Rcpp::Rcout << set_unif_bounds << endl;
   
   SpamTreeMV mtree = SpamTreeMV();
   
-  arma::vec start_w_vec = arma::randn(y.n_elem);
+  arma::vec start_w_vec = arma::zeros(y.n_elem);
   
   mtree = SpamTreeMV(y, X, Z, coords, mv_id, 
                      blocking, gix_block, res_is_ref,
@@ -144,7 +141,7 @@ Rcpp::List spamtree_mv_mcmc(
   mtree.get_loglik_comps_w( mtree.param_data );
   mtree.get_loglik_comps_w( mtree.alter_data );
   
-  Rcpp::Rcout << "start from: " << mtree.alter_data.loglik_w << " " << mtree.param_data.loglik_w << endl;
+  //Rcpp::Rcout << "start from: " << mtree.alter_data.loglik_w << " " << mtree.param_data.loglik_w << endl;
   
   //mtree.deal_with_w(true);
   //mtree.get_loglik_w(mtree.param_data);
@@ -383,13 +380,13 @@ Rcpp::List spamtree_mv_mcmc(
       
         adaptivemc.print(itertime, m);
         
-        for(int pp=0; pp<param.n_elem; pp++){
-          printf("theta%1d=%.4f ", pp, mtree.param_data.theta(pp));
+        for(unsigned int pp=0; pp<param.n_elem; pp++){
+          Rprintf("theta%1d=%.4f ", pp, mtree.param_data.theta(pp));
         }
         for(int tt=0; tt<q; tt++){
-          printf("tausq%1d=%.4f ", tt, 1.0/mtree.tausq_inv(tt));
+          Rprintf("tausq%1d=%.4f ", tt, 1.0/mtree.tausq_inv(tt));
         }
-        printf("\n");
+        Rprintf("\n");
         
         
       } 

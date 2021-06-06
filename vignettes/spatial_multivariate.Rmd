@@ -1,0 +1,136 @@
+---
+title: "Spatial regression with bivariate misaligned outcomes"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{spatial_multivariate}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+The `spamtree` package is built to run multivariate spatial regressions based on spatial multivariate trees and using a non-separable cross-covariance function on latent dimensions. In this vignette we simulate two spatially referenced outcomes.
+
+```{r setup}
+library(abind)
+library(magrittr)
+library(dplyr)
+library(ggplot2)
+library(spamtree)
+
+set.seed(2021)
+
+SS <- 30 # coordinate values for jth dimension 
+n <- SS^2 # total n. locations, including missing ones
+
+xlocs <- seq(0.0, 1, length.out=SS)
+coords <- expand.grid(xlocs, xlocs) %>% 
+  as.data.frame() %>% 
+  arrange(Var1, Var2)
+
+c1 <- coords %>% mutate(mv_id=1)
+c2 <- coords %>% mutate(mv_id=2)
+
+coords <- bind_rows(c1, c2)
+
+coords_q <- coords %>% dplyr::select(-mv_id)
+cx <- coords_q %>% as.matrix()
+ix <- 1:nrow(cx) - 1
+mv_id <- coords$mv_id
+
+q <- 2
+sigma.sq <- 1
+tau.sq <- c(.03, .1)
+tausq_long <- rep(0, nrow(cx))
+tausq_long[mv_id == 1] <- tau.sq[1]
+tausq_long[mv_id == 2] <- tau.sq[2]
+
+# some true values for the non-separable multivariate cross-covariance implemented here
+
+ai1 <- c(1, 1.5)
+ai2 <- c(.1, .51)
+phi_i <- c(1, 2)
+thetamv <- 5
+
+Dmat <- matrix(0, q, q)
+Dmat[2,1] <- 1
+Dmat[upper.tri(Dmat)] <- Dmat[lower.tri(Dmat)]
+
+X <- cbind(rnorm(nrow(coords)), rnorm(nrow(coords)))
+B <- c(-.9, .05)
+
+# generate covariance matrix for full GP
+system.time({
+  CC <- CrossCovarianceAG10(cx, mv_id, cx, mv_id, ai1, ai2, phi_i, thetamv, Dmat)
+})
+LC <- t(chol(CC))
+
+# sample the outcomes at all locations
+y_full <- X %*% B + LC %*% rnorm(nrow(cx)) + sqrt(tausq_long) * rnorm(nrow(cx))
+rm(list=c("CC", "LC"))
+
+# make some na: 0=na
+# (this also creates some misalignment)
+lna <- rep(1, nrow(coords)) 
+lna[((coords_q$Var1 > .4) & (coords_q$Var1 < .9) & 
+       (coords_q$Var2 < .7) & (coords_q$Var2 > .4)) & (mv_id == 1)] <- NA
+lna[((coords_q$Var1 > .2) & (coords_q$Var1 < .7) & 
+       (coords_q$Var2 < .7) & (coords_q$Var2 > .4)) & (mv_id == 2)] <- NA
+y <- y_full * lna
+
+
+simdata <- coords %>% cbind(y) %>% as.data.frame()
+```
+We now run `spamtree`. In practice the data size would be much larger, and we would run many more MCMC iterations.
+```{r run}
+
+# prepare for spamtrees
+mcmc_keep <- 200
+mcmc_burn <- 200
+mcmc_thin <- 2
+
+spamtree_done <- spamtree(y, X, 
+                     cx, mv_id,  
+                     mcmc = list(keep=mcmc_keep, burn=mcmc_burn, thin=mcmc_thin),
+                     num_threads = 10 )
+
+
+```
+And finally we do some postprocessing and plot the predictions for both outcomes, and the latent process. 
+```{r postprocess}
+# predictions
+y_out <- spamtree_done$yhat_mcmc %>% 
+  abind(along=3) %>% `[`(,1,) %>% 
+  apply(1, mean)
+
+w_out <- spamtree_done$w_mcmc %>% 
+  abind(along=3) %>% `[`(,1,) %>% 
+  apply(1, mean)
+
+outdf <- spamtree_done$coordsinfo %>% 
+  rename(mv_id = sort_mv_id) %>%
+  cbind(data.frame(w_spamtree = w_out, 
+                   y_spamtree = y_out))
+
+# plot predictions
+outdf %>% 
+  ggplot(aes(Var1, Var2, fill=y_spamtree)) +
+  geom_raster() + 
+  facet_grid(~mv_id) +
+  scale_fill_viridis_c() +
+  theme_minimal() + theme(legend.position="none")
+
+# plot latent process
+outdf %>% 
+  ggplot(aes(Var1, Var2, fill=w_spamtree)) +
+  geom_raster() + 
+  facet_grid(~mv_id) +
+  scale_fill_viridis_c() +
+  theme_minimal() + theme(legend.position="none")
+
+```

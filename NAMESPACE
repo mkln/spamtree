@@ -1,4 +1,14 @@
 useDynLib(spamtree, .registration=TRUE)
 importFrom(Rcpp, evalCpp)
+importFrom(rlang, .data)
+importFrom(magrittr, "%>%")
+importFrom(magrittr, "%<>%")
+importFrom(magrittr, "%$%")
+importFrom(rlang, `:=`)
 
-export("prebuild", "spamtree", "mvCovAG20107x")
+#importFrom(magrittr, "raise_to_power")
+#importFrom(magrittr, "divide_by")
+#importFrom(tibble, "rownames_to_column")
+
+
+export("spamtree", "CrossCovarianceAG10")

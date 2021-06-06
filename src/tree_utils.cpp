@@ -1,4 +1,4 @@
-#include "multires_utils.h"
+#include "tree_utils.h"
 using namespace std;
 
 
@@ -12,7 +12,7 @@ arma::vec armacolsum(const arma::mat& x){
 }
 
 arma::sp_mat spmat_by_diagmat(arma::sp_mat x, const arma::vec& d){
-  for(int j=0; j<x.n_cols; j++){
+  for(unsigned int j=0; j<x.n_cols; j++){
     x.col(j) *= d(j);
   }
   return x;
@@ -22,7 +22,7 @@ arma::sp_mat spmat_by_diagmat(arma::sp_mat x, const arma::vec& d){
 arma::mat subcube_collapse_via_sum(const arma::cube& mycube, const arma::uvec& whichrows, const arma::uvec& collapse_slices){
   arma::mat result = arma::zeros(whichrows.n_elem, mycube.n_cols);
   
-  for(int i=0; i<result.n_rows; i++){
+  for(unsigned int i=0; i<result.n_rows; i++){
     arma::mat rowmat = mycube.row(whichrows(i));
     //Rcpp::Rcout << arma::size(rowmat) << endl;
     result.row(i) = arma::trans(arma::sum(rowmat.cols(collapse_slices), 1));
@@ -31,7 +31,7 @@ arma::mat subcube_collapse_via_sum(const arma::cube& mycube, const arma::uvec& w
 }
 
 void cube_fill(arma::cube& mycube, const arma::uvec& whichrows, int whichslice, const arma::mat& fillmat){
-  for(int i=0; i<whichrows.n_elem; i++){
+  for(unsigned int i=0; i<whichrows.n_elem; i++){
     mycube.subcube(whichrows(i), 0, whichslice, whichrows(i), mycube.n_cols-1, whichslice) = fillmat.row(i);
   }
 }
