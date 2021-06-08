@@ -3,7 +3,7 @@
 \alias{spamtree}
 %- Also NEED an '\alias' for EACH other topic documented here.
 \title{
-Bayesian Spatial Multivariate Tree GP regression
+Bayesian Spatial Multivariate Tree GP Regression
 }
 \description{
 Bayesian linear multivariate spatial regression using SpamTrees.
@@ -15,21 +15,22 @@ spamtree(y, x, coords,
         K = rep(2, ncol(coords)),
         start_level = 0,
         tree_depth = Inf,
-        last_not_reference = T,
-        limited_tree = F,
-        cherrypick_same_margin = T,
-        cherrypick_group_locations = T,
+        last_not_reference = TRUE,
+        limited_tree = FALSE,
+        cherrypick_same_margin = TRUE,
+        cherrypick_group_locations = TRUE,
         mvbias = 0,
         mcmc = list(keep = 1000, burn = 0, thin = 1),
         num_threads = 4,
-        settings = list(adapting = T, mcmcsd = 0.01, 
-          verbose = F, debug = F, printall = F),
+        verbose = FALSE, 
+        settings = list(adapting = TRUE, mcmcsd = 0.01, 
+          debug = FALSE, printall = FALSE),
         prior = list(set_unif_bounds = NULL, 
           btmlim = NULL, toplim = NULL, vlim = NULL),
         starting = list(beta = NULL, tausq = NULL, theta = NULL, w = NULL),
-        debug = list(sample_beta = T, sample_tausq = T, 
-          sample_theta = T, sample_w = T, 
-          sample_predicts = T)
+        debug = list(sample_beta = TRUE, sample_tausq = TRUE, 
+          sample_theta = TRUE, sample_w = TRUE, 
+          sample_predicts = TRUE)
 )
 }
 %- maybe also 'usage' for other objects documented here.
@@ -65,7 +66,7 @@ bool indicating whether to treat the last level of the tree as a reference set. 
 bool determining whether to use a recursive tree. If \code{TRUE}, each non-root node has 1 parent and \code{prod(K)} children. Otherwise, each node at level \eqn{L} (where root nodes have \eqn{L=0}) has \eqn{L} parents.  
 }
   \item{cherrypick_same_margin}{
-bool used only for multivariate outcomes. This determines how to assign parents to leaf nodes. In a SpamTree, outcome \eqn{j} at a new spatial location is assigned the same parent of its nearest neighbor. If \code{cherrypick_same_margin=T} then the nearest neighbor is searched within the subset of locations for which outcome \eqn{j} was observed. Otherwise, the nearest neighbor is searched within all locations at which any outcome was observed. If outcomes are aligned (all observed at the same locations) and \code{cherrypick_group_locations=T}, then this setting has minimal or no effect. 
+bool used only for multivariate outcomes. This determines how to assign parents to leaf nodes. In a SpamTree, outcome \eqn{j} at a new spatial location is assigned the same parent of its nearest neighbor. If \code{cherrypick_same_margin=TRUE} then the nearest neighbor is searched within the subset of locations for which outcome \eqn{j} was observed. Otherwise, the nearest neighbor is searched within all locations at which any outcome was observed. If outcomes are aligned (all observed at the same locations) and \code{cherrypick_group_locations=TRUE}, then this setting has minimal or no effect. 
 }
   \item{cherrypick_group_locations}{
 bool used in multivariate settings to determine whether the allocation of knots to tree nodes should treat the \eqn{q} outcomes at location \eqn{s \in D} as either (1) a \eqn{q} dimensional vector observed at 1 location, or (2) one observed outcome at each of \eqn{q} locations (i.e. same spatial location but different outcome index). 
@@ -79,11 +80,14 @@ list for setting up MCMC. \code{mcmc$keep} is the number of MCMC samples to be s
   \item{num_threads}{
 integer number of OpenMP threads to use within MCMC. Ineffective if source is compiled without OpenMP support.
 }
+\item{verbose}{
+level of verbosity. All messages are suppressed if \code{verbose=FALSE} (default). It is useful to set \code{verbose=TRUE} for data of medium size or long MCMC chains.
+}
   \item{settings}{
-list with additional settings. \code{settings$adapting} determines whether to use Robust Adaptive Metropolis algorithm of Vihola (2012). \code{settings$mcmcsd} is the initial standard deviation for the MCMC proposals before adaptation. \code{settings$verbose} increases the verbosity of the algorithm. \code{settings$debug} prints more debug messages. \code{settings$printall} determines whether to print to console at each iteration.), 
+list with additional settings. \code{settings$adapting} determines whether to use Robust Adaptive Metropolis algorithm of Vihola (2012). \code{settings$mcmcsd} is the initial standard deviation for the MCMC proposals before adaptation. \code{settings$debug} prints some debug messages. \code{settings$printall} determines whether to print to console at each iteration.
 }
   \item{prior}{
-setup for prior on \eqn{\theta}, which currently only allows to specify the support of independent uniform distributions. See examples. (subject to change at any time).
+setup for prior on \eqn{\theta}, which currently only allows to specify the support of independent uniform distributions. See examples. (subject to change).
 }
   \item{starting}{
 list with starting values for all unknowns. Compatibility checks with \code{prior} are minimal and incompatible values may result in crashes.
@@ -122,16 +126,18 @@ Vihola, M. (2012) Robust adaptive Metropolis algorithm with coerced acceptance r
 }
 
 \examples{
-\dontrun{
-rm(list=ls())
+
+# toy example with tiny dataset and short MCMC
+# on a univariate outcome
 
 library(magrittr)
-library(tidyverse)
+library(dplyr)
+library(ggplot2)
 library(spamtree)
 
 set.seed(2021)
 
-SS <- 25 
+SS <- 15 
 n <- SS^2 # total n. locations, including missing ones
 
 coords <- data.frame(Var1=runif(n), Var2=runif(n)) \%>\%
@@ -158,16 +164,16 @@ simdata <- data.frame(coords,
   mutate(y_observed = ifelse(set_missing==1, NA, y_full))
 
 # MCMC setup
-mcmc_keep <- 1000
-mcmc_burn <- 1000
-mcmc_thin <- 2
+mcmc_keep <- 300
+mcmc_burn <- 300
+mcmc_thin <- 1
 
-ybar <- mean(y, na.rm=T)
+ybar <- mean(y, na.rm=TRUE)
 
 # fit spamtree with defaults
 spamtree_done <- spamtree(y - ybar, X, coords, 
           mcmc = list(keep=mcmc_keep, burn=mcmc_burn, thin=mcmc_thin), 
-          num_threads = 10)
+          num_threads = 1)
 
 # predictions
 y_out <- spamtree_done$yhat_mcmc \%>\% 
@@ -183,30 +189,20 @@ outdf <- spamtree_done$coordsinfo \%>\%
   left_join(simdata)
 
 # plot predictions
-outdf \%>\% 
-  ggplot(aes(Var1, Var2, color=y_mvmr)) +
+pred_plot <- outdf \%>\% 
+  ggplot(aes(Var1, Var2, color=y_spamtree)) +
   geom_point() +
   scale_color_viridis_c()
 
-# rmspe
-outdf \%>\% 
-  filter(!complete.cases(.)) \%>\% 
-  with((y_spamtree - y_full)^2) \%>\% 
-  mean() \%>\% sqrt()
-
 # plot latent process
-outdf \%>\% 
+latent_plot <- outdf \%>\% 
   ggplot(aes(Var1, Var2, color=w_spamtree)) +
   geom_point() + 
   scale_color_viridis_c()
 
 # estimation of regression coefficients
-spamtree_done$beta_mcmc[,,1] \%>\% t() \%>\% 
-  as.data.frame() \%>\% 
-  gather(Coefficient, Sample) \%>\% 
-  ggplot(aes(Sample)) + 
-  geom_density() + 
-  facet_wrap(~Coefficient, scales="free")
+plot(density(spamtree_done$beta_mcmc[1,,1]))
+abline(v=B[1], col="red")
 
-}
+
 }

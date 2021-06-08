@@ -1,11 +1,11 @@
 Package: spamtree
 Type: Package
 Title: Spatial Multivariate Trees
-Version: 0.2.0
-Date: 2021-06-05
+Version: 0.2.1
+Date: 2021-06-08
 Author: Michele Peruzzi
 Maintainer: Michele Peruzzi <michele.peruzzi@duke.edu>
-Description: This package fits multivariate Bayesian spatial regression models for large datasets using Spatial Multivariate Trees (SpamTrees). The methods in this package are detailed in Peruzzi and Dunson (2020) <arXiv:2012.00943>.
+Description: Fits multivariate Bayesian spatial regression models for large datasets using Spatial Multivariate Trees (SpamTrees). The methods in this package are detailed in Peruzzi and Dunson (2020) <arXiv:2012.00943>.
 License: GPL-3
 Imports: Rcpp (>= 1.0.3), FNN, dplyr, magrittr, rlang, tibble
 LinkingTo: Rcpp, RcppArmadillo

@@ -97,7 +97,8 @@ mcmc_thin <- 2
 spamtree_done <- spamtree(y, X, 
                      cx, mv_id,  
                      mcmc = list(keep=mcmc_keep, burn=mcmc_burn, thin=mcmc_thin),
-                     num_threads = 10 )
+                     num_threads = 10,
+                     verbose=TRUE)
 
 
 ```

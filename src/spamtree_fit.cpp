@@ -42,6 +42,7 @@ Rcpp::List spamtree_mv_mcmc(
     char use_alg='S',
     
     bool adapting=false,
+    bool main_verbose=true,
     bool verbose=false,
     bool debug=false,
     bool printall=false,
@@ -79,47 +80,15 @@ Rcpp::List spamtree_mv_mcmc(
   //int k;
   //int npars;
   double dlim=0;
-  Rcpp::Rcout << "d=" << d << " q=" << q << ".\n";
-  //Rcpp::Rcout << "Lower and upper bounds for priors:\n";
-
-  /*
-  if(d == 2){
-    if(q > 2){
-      npars = 1 + 3;
-    } else {
-      npars = 1 + 1;
-    }
-  } else {
-    if(q > 2){
-      npars = 1+5;
-    } else {
-      npars = 1+3; // sigmasq + alpha + beta + phi
-    }
-  }*/
+  if(verbose){
+    Rcpp::Rcout << "d=" << d << " q=" << q << ".\n";
+  }
   
-  //if(d == 2){
-  //  int n_cbase = q > 2? 3: 1;
-  //  npars = 3*q + n_cbase;
-  //}
-  
-  //k = q * (q-1)/2;
-  
-  //Rcpp::Rcout << "Number of pars: " << npars << " plus " << k << " for multivariate\n"; 
-  //npars += k; // for xCovHUV + Dmat for variables (excludes sigmasq)
-  
-  // metropolis search limits
-  //arma::mat tsqi_unif_bounds = arma::zeros(q, 2);
-  //tsqi_unif_bounds.col(0).fill(1e-5);
-  //tsqi_unif_bounds.col(1).fill(1000-1e-5);
   
   arma::mat set_unif_bounds = set_unif_bounds_in;//arma::join_vert(set_unif_bounds_in, 
                                               //tsqi_unif_bounds);
   
-  arma::mat metropolis_sd = mcmcsd;//arma::zeros(set_unif_bounds.n_rows, set_unif_bounds.n_rows);
-  //metropolis_sd.submat(0, 0, npars-1, npars-1) = mcmcsd;
-  //metropolis_sd.submat(npars, npars, npars+q-1, npars+q-1) = .1 * arma::eye(q, q);
-  
-  //Rcpp::Rcout << set_unif_bounds << endl;
+  arma::mat metropolis_sd = mcmcsd;
   
   SpamTreeMV mtree = SpamTreeMV();
   
@@ -171,11 +140,8 @@ Rcpp::List spamtree_mv_mcmc(
     yhat_mcmc(i) = arma::zeros(mtree.y.n_rows, 1);
     //eta_rpx_mcmc(i) = arma::zeros(coords.n_rows, q, n_res);
   }
-  
-  
-  
+
   double logaccept;
-  
   
   // adaptive params
   int mcmc = mcmc_thin*mcmc_keep + mcmc_burn;
@@ -186,7 +152,10 @@ Rcpp::List spamtree_mv_mcmc(
                        metropolis_sd);
   
   
-  Rcpp::Rcout << "Running MCMC for " << mcmc << " iterations." << endl;
+  if(main_verbose){
+    Rcpp::Rcout << "Running MCMC for " << mcmc << " iterations." << endl;
+  }
+  
   
   double ll_upd_msg;
   
@@ -277,14 +246,6 @@ Rcpp::List spamtree_mv_mcmc(
           jacobian;
       
         
-        if(isnan(logaccept)){
-          Rcpp::Rcout << new_param.t() << endl;
-          Rcpp::Rcout << param.t() << endl;
-          Rcpp::Rcout << new_loglik << " " << current_loglik << " " << jacobian << endl;
-          //throw 1;
-        }
-        
-        
         accepted = do_I_accept(logaccept) & acceptable;
         
         if(accepted){
@@ -302,7 +263,7 @@ Rcpp::List spamtree_mv_mcmc(
           //need_update = true;
           
           std::chrono::steady_clock::time_point end_copy = std::chrono::steady_clock::now();
-          if(verbose_mcmc & sample_theta & debug & verbose){
+          if(main_verbose & verbose_mcmc & sample_theta & debug & verbose){
             Rcpp::Rcout << "[theta] accepted from " <<  ll_upd_msg << " to " << current_loglik << ", "
                         << std::chrono::duration_cast<std::chrono::microseconds>(end_copy - start_copy).count() << "us.\n"; 
           } 
@@ -310,7 +271,7 @@ Rcpp::List spamtree_mv_mcmc(
           //need_update = false;
           //mtree.tausq_inv = tausqi_original;
           
-          if(verbose_mcmc & sample_theta & debug & verbose){
+          if(main_verbose & verbose_mcmc & sample_theta & debug & verbose){
             Rcpp::Rcout << "[theta] rejected (log accept. " << logaccept << ")" << endl;
           }
         }
@@ -327,7 +288,7 @@ Rcpp::List spamtree_mv_mcmc(
         
       }
       end = std::chrono::steady_clock::now();
-      if(verbose_mcmc & sample_theta & verbose){
+      if(main_verbose & verbose_mcmc & sample_theta & verbose){
         Rcpp::Rcout << "[theta] " 
                     << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "us. ";
         if(verbose || debug){
@@ -348,7 +309,7 @@ Rcpp::List spamtree_mv_mcmc(
         start = std::chrono::steady_clock::now();
         mtree.gibbs_sample_tausq();
         end = std::chrono::steady_clock::now();
-        if(verbose_mcmc & sample_tausq & verbose){
+        if(main_verbose & verbose_mcmc & sample_tausq & verbose){
           Rcpp::Rcout << "[tausq] " 
                       << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "us. " 
                       << endl; 
@@ -359,7 +320,7 @@ Rcpp::List spamtree_mv_mcmc(
         start = std::chrono::steady_clock::now();
         mtree.deal_with_beta();
         end = std::chrono::steady_clock::now();
-        if(verbose_mcmc & sample_beta & verbose){
+        if(main_verbose & verbose_mcmc & sample_beta & verbose){
           Rcpp::Rcout << "[beta] " 
                       << std::chrono::duration_cast<std::chrono::microseconds>(end - start).count() << "us. "; 
           if(verbose || debug){
@@ -370,7 +331,7 @@ Rcpp::List spamtree_mv_mcmc(
       
       //need_update = true;
       
-      if(printall){
+      if(main_verbose & printall){
         //Rcpp::checkUserInterrupt();
         interrupted = checkInterrupt();
         if(interrupted){
@@ -398,7 +359,7 @@ Rcpp::List spamtree_mv_mcmc(
             throw 1;
           }
           end_mcmc = std::chrono::steady_clock::now();
-          if(true){
+          if(main_verbose){
             int time_tick = std::chrono::duration_cast<std::chrono::milliseconds>(end_mcmc - tick_mcmc).count();
             int time_mcmc = std::chrono::duration_cast<std::chrono::milliseconds>(end_mcmc - start_mcmc).count();
             adaptivemc.print_summary(time_tick, time_mcmc, m, mcmc);
@@ -431,9 +392,12 @@ Rcpp::List spamtree_mv_mcmc(
     
     end_all = std::chrono::steady_clock::now();
     double mcmc_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_all - start_all).count();
-    Rcpp::Rcout << "MCMC done [" 
-                << mcmc_time
-                <<  "ms]" << endl;
+    if(main_verbose){
+      Rcpp::Rcout << "MCMC done [" 
+                  << mcmc_time
+                  <<  "ms]" << endl;
+    }
+    
     
     
     return Rcpp::List::create(
@@ -441,15 +405,11 @@ Rcpp::List spamtree_mv_mcmc(
       Rcpp::Named("yhat_mcmc") = yhat_mcmc,
       Rcpp::Named("beta_mcmc") = beta_mcmc,
       Rcpp::Named("tausq_mcmc") = tausq_mcmc,
-      
       Rcpp::Named("theta_mcmc") = theta_mcmc,
-      
       Rcpp::Named("paramsd") = adaptivemc.paramsd,
       Rcpp::Named("block_ct_obs") = mtree.block_ct_obs,
-      
       Rcpp::Named("indexing") = mtree.indexing,
       Rcpp::Named("parents_indexing") = mtree.parents_indexing,
-      
       Rcpp::Named("mcmc_time") = mcmc_time/1000.0
     );
     
@@ -457,7 +417,10 @@ Rcpp::List spamtree_mv_mcmc(
     end_all = std::chrono::steady_clock::now();
     Rcpp::Rcout << exc.what() << endl;
     double mcmc_time = std::chrono::duration_cast<std::chrono::milliseconds>(end_all - start_all).count();
-    Rcpp::Rcout << "MCMC has been interrupted." << endl;
+    if(main_verbose){
+      Rcpp::Rcout << "MCMC has been interrupted." << endl;
+    }
+    
     
     return Rcpp::List::create(
       Rcpp::Named("None") = arma::zeros(0)

@@ -1,38 +1,28 @@
 spamtree <- function(y, x, coords, 
                      mv_id = rep(1, length(y)),
-                     cell_size=25, 
-                     K=rep(2, ncol(coords)),
+                     cell_size = 25, 
+                     K = rep(2, ncol(coords)),
                      start_level = 0,
                      tree_depth = Inf,
-                     last_not_reference = T,
-                     limited_tree = F,
-                     cherrypick_same_margin = T,
-                     cherrypick_group_locations = T,
-                     mvbias=0,
+                     last_not_reference = TRUE,
+                     limited_tree = FALSE,
+                     cherrypick_same_margin = TRUE,
+                     cherrypick_group_locations = TRUE,
+                     mvbias = 0,
                      mcmc        = list(keep=1000, burn=0, thin=1),
                      num_threads = 4,
-                     settings    = list(adapting=T, mcmcsd=.01, verbose=F, debug=F, printall=F),
+                     verbose = FALSE,
+                     settings    = list(adapting=TRUE, mcmcsd=.01, debug=FALSE, printall=FALSE),
                      prior       = list(set_unif_bounds=NULL, btmlim=NULL, toplim=NULL, vlim=NULL),
                      starting    = list(beta=NULL, tausq=NULL, theta=NULL, w=NULL),
-                     debug       = list(sample_beta=T, sample_tausq=T, 
-                                        sample_theta=T, 
-                                        sample_w=T, sample_predicts=T)
+                     debug       = list(sample_beta=TRUE, sample_tausq=TRUE, 
+                                        sample_theta=TRUE, 
+                                        sample_w=TRUE, sample_predicts=TRUE)
 ){
   
   # cell_size = (approximate) number of location for each block
   # K = number of blocks at resolution L is K^(L-1), with L=1, ... , M.
   use_alg <- 'S'
-  
-  # init
-  cat(" Bayesian Spatial Multivariate Tree\n
-      
-          :   :  :   :
-           \\ /    \\ /
-            o      o
-              \\   /
-                o\n\n
-\n
-Building...")
   
   if(1){
     mcmc_keep <- mcmc$keep
@@ -42,9 +32,15 @@ Building...")
     mcmc_adaptive    <- settings$adapting
     mcmc_cache       <- settings$cache
     mcmc_cache_gibbs <- settings$cache_gibbs
-    mcmc_verbose     <- settings$verbose
+    main_verbose     <- verbose 
+    mcmc_verbose     <- verbose > 1
     mcmc_debug       <- settings$debug
     mcmc_printall    <- settings$printall
+    
+    if(main_verbose & mcmc_printall){
+      cat(" Bayesian Spatial Multivariate Tree regression\n")
+    }
+    
     
     sample_beta    <- debug$sample_beta
     sample_tausq   <- debug$sample_tausq
@@ -63,7 +59,7 @@ Building...")
       stop("Not implemented in domains of dimension d>2.")
     }
 
-    elevation_3d <- F
+    elevation_3d <- FALSE
     
     
     Z <- matrix(0, nrow=nrow(coords), q)
@@ -243,13 +239,15 @@ Building...")
   axis_cell_size <- rep(axis_size, dd)
 
   
-  cat("Building reference set.\n")
+  if(main_verbose) {
+    cat("Building reference set.\n")
+  }
   mgp_tree <- make_tree(coords, na_which, sort_mv_id, 
                         axis_cell_size, K, start_level, tree_depth, 
                         last_not_reference,
                         cherrypick_same_margin,
                         cherrypick_group_locations,
-                        mvbias)
+                        mvbias, main_verbose)
 
   #cat("Partitioning total time: ", as.numeric(ptime["elapsed"]), "\n")
   
@@ -300,14 +298,15 @@ Building...")
     dplyr::left_join(coords_blocking %>%
                        dplyr::select(.data$ix, .data$block), by=c("ix"="ix")) %>%
     dplyr::group_by(.data$block) %>% 
-    dplyr::summarise(perc_avail = sum(na_which, na.rm=T)/dplyr::n(), .groups="drop")
+    dplyr::summarise(perc_avail = sum(na_which, na.rm=TRUE)/dplyr::n(), .groups="drop")
   non_empty_blocks <- block_ct_obs_df[block_ct_obs_df$perc_avail>0, "block"] %>% 
     dplyr::pull(.data$block)
   
   
-  #save.image(file="temp.RData")
+  if(main_verbose){
+    cat("Building graph.\n")
+  }
   
-  cat("Building graph.\n")
   if(limited_tree){
     parents_children <- make_edges_limited(parchi_map %>% as.matrix(), non_empty_blocks, res_is_ref)
   } else {
@@ -355,6 +354,7 @@ Building...")
         use_alg,
         
         mcmc_adaptive, 
+        main_verbose,
         mcmc_verbose, mcmc_debug, 
         mcmc_printall,
         

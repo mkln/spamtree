@@ -64,10 +64,14 @@ Michele Peruzzi \email{michele.peruzzi@duke.edu}
 }
 
 \examples{
-\dontrun{
+
+library(magrittr)
+library(dplyr)
+library(spamtree)
+
+SS <- 10
 xlocs <- seq(0.0, 1, length.out=SS)
 coords <- expand.grid(xlocs, xlocs)
-
 c1 <- coords \%>\% mutate(mv_id=1)
 c2 <- coords \%>\% mutate(mv_id=2)
 
@@ -76,18 +80,17 @@ coords_q <- coords \%>\% dplyr::select(-mv_id)
 cx <- coords_q \%>\% as.matrix()
 mv_id <- coords$mv_id
 
-q <- 2
-
 ai1 <- c(1, 1.5)
 ai2 <- c(.1, .51)
 phi_i <- c(1, 2)
 thetamv <- 5
 
+q <- 2
 Dmat <- matrix(0, q, q)
 Dmat[2,1] <- 1
 Dmat[upper.tri(Dmat)] <- Dmat[lower.tri(Dmat)]
 
 CC <- CrossCovarianceAG10(cx, mv_id, cx, mv_id, ai1, ai2, phi_i, thetamv, Dmat)
 
-}
+
 }

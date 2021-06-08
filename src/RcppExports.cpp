@@ -108,8 +108,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // spamtree_mv_mcmc
-Rcpp::List spamtree_mv_mcmc(const arma::mat& y, const arma::mat& X, const arma::mat& Z, const arma::mat& coords, const arma::uvec& mv_id, const arma::uvec& blocking, const arma::uvec& gix_block, const arma::uvec& res_is_ref, const arma::field<arma::uvec>& parents, const arma::field<arma::uvec>& children, bool limited_tree, const arma::vec& layer_names, const arma::vec& layer_gibbs_group, const arma::field<arma::uvec>& indexing, const arma::mat& set_unif_bounds_in, const arma::mat& start_w, const arma::vec& theta, const arma::vec& beta, const double& tausq, const arma::mat& mcmcsd, int mcmc_keep, int mcmc_burn, int mcmc_thin, int num_threads, char use_alg, bool adapting, bool verbose, bool debug, bool printall, bool sample_beta, bool sample_tausq, bool sample_theta, bool sample_w, bool sample_predicts);
-RcppExport SEXP _spamtree_spamtree_mv_mcmc(SEXP ySEXP, SEXP XSEXP, SEXP ZSEXP, SEXP coordsSEXP, SEXP mv_idSEXP, SEXP blockingSEXP, SEXP gix_blockSEXP, SEXP res_is_refSEXP, SEXP parentsSEXP, SEXP childrenSEXP, SEXP limited_treeSEXP, SEXP layer_namesSEXP, SEXP layer_gibbs_groupSEXP, SEXP indexingSEXP, SEXP set_unif_bounds_inSEXP, SEXP start_wSEXP, SEXP thetaSEXP, SEXP betaSEXP, SEXP tausqSEXP, SEXP mcmcsdSEXP, SEXP mcmc_keepSEXP, SEXP mcmc_burnSEXP, SEXP mcmc_thinSEXP, SEXP num_threadsSEXP, SEXP use_algSEXP, SEXP adaptingSEXP, SEXP verboseSEXP, SEXP debugSEXP, SEXP printallSEXP, SEXP sample_betaSEXP, SEXP sample_tausqSEXP, SEXP sample_thetaSEXP, SEXP sample_wSEXP, SEXP sample_predictsSEXP) {
+Rcpp::List spamtree_mv_mcmc(const arma::mat& y, const arma::mat& X, const arma::mat& Z, const arma::mat& coords, const arma::uvec& mv_id, const arma::uvec& blocking, const arma::uvec& gix_block, const arma::uvec& res_is_ref, const arma::field<arma::uvec>& parents, const arma::field<arma::uvec>& children, bool limited_tree, const arma::vec& layer_names, const arma::vec& layer_gibbs_group, const arma::field<arma::uvec>& indexing, const arma::mat& set_unif_bounds_in, const arma::mat& start_w, const arma::vec& theta, const arma::vec& beta, const double& tausq, const arma::mat& mcmcsd, int mcmc_keep, int mcmc_burn, int mcmc_thin, int num_threads, char use_alg, bool adapting, bool main_verbose, bool verbose, bool debug, bool printall, bool sample_beta, bool sample_tausq, bool sample_theta, bool sample_w, bool sample_predicts);
+RcppExport SEXP _spamtree_spamtree_mv_mcmc(SEXP ySEXP, SEXP XSEXP, SEXP ZSEXP, SEXP coordsSEXP, SEXP mv_idSEXP, SEXP blockingSEXP, SEXP gix_blockSEXP, SEXP res_is_refSEXP, SEXP parentsSEXP, SEXP childrenSEXP, SEXP limited_treeSEXP, SEXP layer_namesSEXP, SEXP layer_gibbs_groupSEXP, SEXP indexingSEXP, SEXP set_unif_bounds_inSEXP, SEXP start_wSEXP, SEXP thetaSEXP, SEXP betaSEXP, SEXP tausqSEXP, SEXP mcmcsdSEXP, SEXP mcmc_keepSEXP, SEXP mcmc_burnSEXP, SEXP mcmc_thinSEXP, SEXP num_threadsSEXP, SEXP use_algSEXP, SEXP adaptingSEXP, SEXP main_verboseSEXP, SEXP verboseSEXP, SEXP debugSEXP, SEXP printallSEXP, SEXP sample_betaSEXP, SEXP sample_tausqSEXP, SEXP sample_thetaSEXP, SEXP sample_wSEXP, SEXP sample_predictsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -139,6 +139,7 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type num_threads(num_threadsSEXP);
     Rcpp::traits::input_parameter< char >::type use_alg(use_algSEXP);
     Rcpp::traits::input_parameter< bool >::type adapting(adaptingSEXP);
+    Rcpp::traits::input_parameter< bool >::type main_verbose(main_verboseSEXP);
     Rcpp::traits::input_parameter< bool >::type verbose(verboseSEXP);
     Rcpp::traits::input_parameter< bool >::type debug(debugSEXP);
     Rcpp::traits::input_parameter< bool >::type printall(printallSEXP);
@@ -147,7 +148,7 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< bool >::type sample_theta(sample_thetaSEXP);
     Rcpp::traits::input_parameter< bool >::type sample_w(sample_wSEXP);
     Rcpp::traits::input_parameter< bool >::type sample_predicts(sample_predictsSEXP);
-    rcpp_result_gen = Rcpp::wrap(spamtree_mv_mcmc(y, X, Z, coords, mv_id, blocking, gix_block, res_is_ref, parents, children, limited_tree, layer_names, layer_gibbs_group, indexing, set_unif_bounds_in, start_w, theta, beta, tausq, mcmcsd, mcmc_keep, mcmc_burn, mcmc_thin, num_threads, use_alg, adapting, verbose, debug, printall, sample_beta, sample_tausq, sample_theta, sample_w, sample_predicts));
+    rcpp_result_gen = Rcpp::wrap(spamtree_mv_mcmc(y, X, Z, coords, mv_id, blocking, gix_block, res_is_ref, parents, children, limited_tree, layer_names, layer_gibbs_group, indexing, set_unif_bounds_in, start_w, theta, beta, tausq, mcmcsd, mcmc_keep, mcmc_burn, mcmc_thin, num_threads, use_alg, adapting, main_verbose, verbose, debug, printall, sample_beta, sample_tausq, sample_theta, sample_w, sample_predicts));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -235,7 +236,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_spamtree_list_qtile", (DL_FUNC) &_spamtree_list_qtile, 2},
     {"_spamtree_par_huvtransf_fwd", (DL_FUNC) &_spamtree_par_huvtransf_fwd, 2},
     {"_spamtree_par_huvtransf_back", (DL_FUNC) &_spamtree_par_huvtransf_back, 2},
-    {"_spamtree_spamtree_mv_mcmc", (DL_FUNC) &_spamtree_spamtree_mv_mcmc, 34},
+    {"_spamtree_spamtree_mv_mcmc", (DL_FUNC) &_spamtree_spamtree_mv_mcmc, 35},
     {"_spamtree_kthresholds", (DL_FUNC) &_spamtree_kthresholds, 2},
     {"_spamtree_col_to_string", (DL_FUNC) &_spamtree_col_to_string, 1},
     {"_spamtree_part_axis_parallel_lmt", (DL_FUNC) &_spamtree_part_axis_parallel_lmt, 2},

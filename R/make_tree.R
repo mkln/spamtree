@@ -1,13 +1,13 @@
 make_tree <- function(coords, na_which, sort_mv_id, 
-                      axis_cell_size=c(5,5), K=c(2,2), 
-                      start_level=0, tree_depth = Inf,
-                      last_not_reference=T,
-                      cherrypick_same_margin = T,
-                      cherrypick_group_locations = T,
-                      mvbias=0){
+                      axis_cell_size = c(5,5), K = c(2,2), 
+                      start_level = 0, tree_depth = Inf,
+                      last_not_reference = TRUE,
+                      cherrypick_same_margin = TRUE,
+                      cherrypick_group_locations = TRUE,
+                      mvbias = 0, verbose=T){
   # mvbias: 0 = treat all multivariate margins the same
-  # >0 = prefer picking sparser margins for lower resolutions
-
+  # >0 = prefer picking sparser margins for lower levels of the tree
+  
   max_res <- start_level + tree_depth 
   
   mv_id_weights <- table(na_which, sort_mv_id) %>% `[`(1,) %>% 
@@ -51,14 +51,20 @@ make_tree <- function(coords, na_which, sort_mv_id,
   
   timings <- rep(0, 3)
   
-  cat("Branching the tree")
+  if(verbose){
+    cat("Branching the tree")
+  }
+  
   
   res_ix <- 1
   
   first_steps <- system.time({
     while((res <= max_res) & (nrow(cx) > 0)){
       
-      cat(" ", res, "(",res_ix,")")
+      if(verbose){
+        cat(" ", res, "(",res_ix,")")
+      }
+      
       # first, tessellate to find locations that are spread out. select one for each cell.
       # second, with the resulting subsample then actually split into blocks
       
@@ -148,16 +154,19 @@ make_tree <- function(coords, na_which, sort_mv_id,
     }
   })
   
-  cat(".\n")
+  if(verbose){
+    cat(".\n")
+  }
+  
   
   res_is_ref <- rep(1, res_ix-1)
   if(last_not_reference & (res < max_res)){
     res_is_ref[ length(res_is_ref) ] <- 0
   }
   
-  cat("Finalizing with leaves.\n")
-  #print(timings)
-  #cat("Resolution part 1:", as.numeric(first_steps["elapsed"]), "\n")
+  if(verbose){
+    cat("Finalizing with leaves.\n")
+  }
   
   last_steps <- system.time({
     # now that we have recursive domain partitioning, 
@@ -295,13 +304,12 @@ make_tree <- function(coords, na_which, sort_mv_id,
       coords_all <- coords_refset
     }
     
-    print(res_is_ref)
     if(length(res_is_ref) == 1){
       res_is_ref <- 1
     }
     
     # now manage missing
-    # if there are leftovers then look resolution before those.
+    # if there are leftovers then look at previous level
     max_res <- coords_all$res %>% max()
     res_of_missing <- max_res + 1 
     blockname = sprintf("block_res%02d", res_of_missing)
@@ -404,7 +412,6 @@ make_tree <- function(coords, na_which, sort_mv_id,
       res_is_ref <- c(res_is_ref, 0)
     }
   })
-  #cat("Resolution part 2:", as.numeric(last_steps["elapsed"]), "\n")
   
   return(list(coords_blocking = coords_all,
               parchi_map = parchi_map %>% unique(),

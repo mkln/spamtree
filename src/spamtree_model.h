@@ -4,8 +4,6 @@
 #include <omp.h>
 #endif
 
-#include <stdexcept>
-
 #include "R.h"
 #include "find_nan.h"
 #include "mh_adapt.h"
@@ -122,8 +120,6 @@ public:
   
   // debug var
   Rcpp::List debug_stuff; 
-  
-  void message(string s);
   
   // init / indexing
   void init_indexing();
